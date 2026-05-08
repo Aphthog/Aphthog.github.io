@@ -1,0 +1,30 @@
+# _config.next.yml
+
+# 主题风格: Muse（简洁）/ Mist（紧凑）/ Pisces（双栏）/ Gemini（扁平化）
+scheme: Gemini
+
+# 网站图标
+favicon:
+  small: /images/favicon-16x16.png
+  medium: /images/favicon-32x32.png
+
+# 社交链接
+social:
+  GitHub: https://github.com/camille || fab fa-github
+
+# 侧边栏头像
+avatar:
+  url: # /images/avatar.png（后续可替换）
+  rounded: true
+  rotated: false
+
+# 文章摘要
+excerpt_description: true
+
+# 返回顶部按钮
+back2top:
+  enable: true
+
+# 页脚信息
+footer:
+  since: 2026

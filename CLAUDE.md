@@ -1,0 +1,41 @@
+# Claude Code 配置
+
+## gstack
+
+- 使用 gstack 的 `/browse` 技能进行所有网页浏览
+- 切勿使用 `mcp__claude-in-chrome__*` 工具
+- 可用技能：
+  - `/office-hours`
+  - `/plan-ceo-review`
+  - `/plan-eng-review`
+  - `/plan-design-review`
+  - `/design-consultation`
+  - `/design-shotgun`
+  - `/design-html`
+  - `/review`
+  - `/ship`
+  - `/land-and-deploy`
+  - `/canary`
+  - `/benchmark`
+  - `/browse`
+  - `/connect-chrome`
+  - `/qa`
+  - `/qa-only`
+  - `/design-review`
+  - `/setup-browser-cookies`
+  - `/setup-deploy`
+  - `/setup-gbrain`
+  - `/retro`
+  - `/investigate`
+  - `/document-release`
+  - `/codex`
+  - `/cso`
+  - `/autoplan`
+  - `/plan-devex-review`
+  - `/devex-review`
+  - `/careful`
+  - `/freeze`
+  - `/guard`
+  - `/unfreeze`
+  - `/gstack-upgrade`
+  - `/learn`

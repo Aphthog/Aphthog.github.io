@@ -1,30 +1,102 @@
-# _config.next.yml
+# ========== NexT 主题配置 ==========
 
-# 主题风格: Muse（简洁）/ Mist（紧凑）/ Pisces（双栏）/ Gemini（扁平化）
-scheme: Gemini
+# 风格: Muse（极简）/ Mist（紧凑）/ Pisces（双栏） / Gemini（扁平）
+scheme: Pisces
 
-# 网站图标
-favicon:
-  small: /images/favicon-16x16.png
-  medium: /images/favicon-32x32.png
+# ---------- 暗色模式 ----------
+darkmode: false
 
-# 社交链接
-social:
-  GitHub: https://github.com/camille || fab fa-github
+# ---------- 字体 ----------
+font:
+  enable: true
+  global:
+    external: false
+    family: 'PingFang SC, Microsoft YaHei, Hiragino Sans GB, Noto Sans CJK SC, sans-serif'
+    size: 16px
+  title:
+    external: false
+    family: 'PingFang SC, Microsoft YaHei, Noto Serif CJK SC, serif'
+    size: 24px
+  headings:
+    external: false
+    family: 'PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif'
+  posts:
+    external: false
+    family: 'PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif'
+    size: 16px
+  codes:
+    external: false
+    family: 'Fira Code, Source Code Pro, Consolas, monospace'
+    size: 14px
 
-# 侧边栏头像
+# ---------- 配色 ----------
+theme_color:
+  light: "#4a6fa5"
+  dark: "#87cefa"
+
+# ---------- 菜单 ----------
+menu:
+  home: / || fa fa-home
+  about: /about/ || fa fa-user
+  archives: /archives/ || fa fa-archive
+  tags: /tags/ || fa fa-tags
+
+# ---------- 侧边栏 ----------
+sidebar:
+  position: left
+  display: post
+  offset: 12
+  width: 280
+
+# ---------- 头像 ----------
 avatar:
-  url: # /images/avatar.png（后续可替换）
   rounded: true
   rotated: false
 
-# 文章摘要
-excerpt_description: true
+# ---------- 社交链接 ----------
+social:
+  GitHub: https://github.com/Aphthog || fab fa-github
 
-# 返回顶部按钮
+# ---------- 文章设置 ----------
+excerpt_description: true
+auto_excerpt:
+  enable: true
+  length: 150
+
+# 阅读进度条
+reading_progress:
+  enable: true
+  position: top
+  color: "#888888"
+  height: 2px
+
+# 文章元信息
+post_meta:
+  item_text: true
+  created_at: true
+  updated_at:
+    enable: true
+    another_day: true
+
+# ---------- 返回顶部 ----------
 back2top:
   enable: true
+  sidebar: false
+  scrollpercent: true
 
-# 页脚信息
+# ---------- 页脚 ----------
 footer:
   since: 2026
+  powered: false
+  # 备案号（ICP）
+  # beian:
+  #   enable: false
+  #   icp:
+
+# ---------- 代码块 ----------
+codeblock:
+  highlight_theme: "normal"
+  copy_button:
+    enable: true
+    show_result: true
+    style: flat

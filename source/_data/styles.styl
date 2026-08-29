@@ -1,0 +1,231 @@
+// ======== Layout: 上下堆叠，取消两栏 ========
+.main {
+  display: block !important;
+  width: auto !important;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.column {
+  width: auto !important;
+}
+.main-inner {
+  width: auto !important;
+}
+.footer-inner {
+  padding-left: 0 !important;
+  text-align: center;
+}
+
+// Selection
+::selection { background: #d4783e; color: white; }
+
+// Fix menu active white background
+:root { --menu-item-bg-color: transparent !important; }
+.menu-item a:hover, .menu-item a.menu-item-active { background: transparent !important; }
+
+// Headband
+.headband { height: 2px !important; }
+
+// ======== Header ========
+.header { background: transparent; padding: 28px 0 0; }
+.site-brand-container { background: transparent !important; }
+.brand { background: transparent; padding: 0; }
+.brand:hover { background: transparent; }
+.site-title { font-family: Georgia, 'Noto Serif SC', serif; font-weight: 400; font-size: 22px; color: #3a3028; }
+.site-subtitle { color: #b0a090; margin-top: 2px; }
+
+// ======== Navigation ========
+.site-nav { background: transparent; margin-top: 0; }
+.menu { margin: 0; padding: 0; }
+.menu .menu-item { margin: 0 24px 0 0; display: inline-block; }
+.menu .menu-item a { position: relative; color: #9a8a78; font-size: 14px; border-bottom: none; padding: 6px 0; letter-spacing: 0.3px; transition: color 250ms ease; }
+.menu .menu-item a:hover { color: #d4783e; background: none; }
+.menu .menu-item-active a { color: #d4783e; background: none; }
+
+// Desktop nav: hide mobile toggle, show nav inline
+@media (min-width: 992px) {
+  .site-nav-toggle, .site-nav-right { display: none; }
+  .site-nav { display: block !important; margin-top: 8px; }
+}
+
+// ======== Post (无卡片背景) ========
+.posts-expand { padding-top: 20px; }
+.post-block { background: transparent !important; padding: 0; }
+.post { background: transparent; padding: 32px 0; border-radius: 0; }
+
+// Post title
+.post-title { font-family: Georgia, 'Noto Serif SC', serif; font-weight: 400; font-size: 1.5em; margin-top: 0; }
+.post-title a { color: #3a3028; }
+.post-title a:hover { color: #d4783e; }
+.post-title-link { color: #3a3028; }
+
+// Post meta
+.post-meta { color: #b0a090; font-size: 0.85em; margin-top: 4px; }
+.post-meta a { color: #b0a090; }
+.post-meta a:hover { color: #d4783e; }
+.post-meta .post-meta-item-icon { display: none; }
+.post-meta .post-meta-divider { margin: 0 8px; color: #d0c8b8; }
+
+// Post body
+.post-body { font-size: 15px; line-height: 1.75; color: #3a3028; }
+.post-body a { color: #d4783e; border-bottom: 1px solid #e0d6c6; }
+.post-body a:hover { color: #c4672e; border-bottom-color: #d4783e; }
+
+// Post footer (tags)
+.post-footer { margin-top: 24px; }
+.post-tags { margin-top: 12px; }
+.post-tags .tag { background: #f5efe6; color: #9a8a78; border-radius: 4px; padding: 3px 10px; font-size: 0.82em; display: inline-block; margin: 0 4px 4px 0; }
+.post-tags .tag:hover { background: #d4783e; color: white; }
+
+// ======== Blockquote ========
+blockquote { border-left: 3px solid #d4783e; background: #f5efe6; color: #6a5a4a; margin: 1em 0; padding: 12px 20px; }
+
+// ======== Code ========
+code { background: #f5efe6; color: #c4672e; border-radius: 3px; padding: 2px 6px; font-size: 0.9em; }
+.highlight { border-radius: 6px; margin: 1em 0; }
+.highlight table { border-radius: 6px; }
+.highlight .gutter { border-right: 1px solid #e8e0d6; }
+
+// ======== Headings in posts ========
+.post-body h1, .post-body h2, .post-body h3, .post-body h4 { font-family: Georgia, 'Noto Serif SC', serif; font-weight: 400; color: #3a3028; }
+.post-body h2 { font-size: 1.4em; margin: 1.5em 0 0.5em; }
+.post-body h3 { font-size: 1.15em; margin: 1.5em 0 0.5em; }
+
+// ======== Archive / Category / Tag listing ========
+.posts-collapse { background: transparent; padding: 24px 0; border-radius: 0; margin: 0; }
+.posts-collapse .post-title { font-size: 1em; font-family: -apple-system, 'Noto Sans SC', sans-serif; }
+.posts-collapse .post-meta { color: #b0a090; }
+.posts-collapse .collection-title { color: #d4783e; font-family: Georgia, serif; font-size: 1.3em; }
+.posts-collapse .collection-title small { color: #b0a090; }
+.posts-collapse .post-header { border-bottom: none; }
+
+.category-all-page, .tag-all-page { background: transparent; padding: 24px 0; border-radius: 0; }
+.category-all-page .category-all-title, .tag-all-page .tag-all-title { font-family: Georgia, 'Noto Serif SC', serif; color: #3a3028; }
+.category-all-page .category-list-item a { color: #9a8a78; }
+.category-all-page .category-list-item a:hover { color: #d4783e; }
+.category-all-page .category-list-count { color: #b0a090; }
+.tag-all-page .tag-list-item a { color: #9a8a78; }
+.tag-all-page .tag-list-item a:hover { color: #d4783e; }
+.tag-all-page .tag-list-count { color: #b0a090; }
+
+// ======== Pagination ========
+.pagination { margin: 24px 0 48px; text-align: center; }
+.pagination .page-number, .pagination .space, .pagination .extend { color: #9a8a78; border: none; border-radius: 4px; padding: 6px 12px; font-size: 14px; }
+.pagination .page-number:hover, .pagination .extend:hover { color: #d4783e; background: transparent; }
+.pagination .page-number.current { background: #d4783e; color: white; border-radius: 4px; }
+
+// ======== Footer ========
+.footer { color: #b0a090; font-size: 13px; padding: 20px 0; border: none; background: transparent; }
+.footer a { color: #9a8a78; border: none; }
+.footer a:hover { color: #d4783e; }
+.footer-inner { text-align: center; }
+
+// ======== Buttons ========
+.btn { border-radius: 4px; }
+.btn:hover { background: #c4672e; }
+
+// ======== About page ========
+.page-about .post-body { font-size: 15px; }
+
+// ======== Back to top ========
+.back-to-top { background: #d4783e; color: white; }
+.back-to-top:hover { background: #c4672e; color: white; }
+
+// ======== Reading progress ========
+.reading-progress-bar { background: #d4783e; }
+
+// ======== Interaction & Motion ========
+
+// Smooth scroll
+html { scroll-behavior: smooth; }
+
+// Animated nav underline
+.menu .menu-item a {
+  position: relative;
+  transition: color 250ms ease;
+}
+.menu .menu-item a::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background: #d4783e;
+  transition: width 250ms ease;
+}
+.menu .menu-item a:hover::after {
+  width: 100%;
+}
+.menu .menu-item-active a::after {
+  width: 100%;
+}
+
+// Smooth transitions on interactive elements
+.post-title a { transition: color 200ms ease; }
+.post-meta a { transition: color 200ms ease; }
+.post-body a { transition: color 200ms ease, border-color 200ms ease; }
+.category-all-page .category-list-item a { transition: color 200ms ease; }
+.tag-all-page .tag-list-item a { transition: color 200ms ease; }
+
+// Tag hover lift
+.post-tags .tag {
+  transition: all 250ms ease;
+  cursor: default;
+}
+.post-tags .tag:hover {
+  transform: translateY(-1.5px);
+}
+
+// Image subtle zoom
+.post-body img {
+  transition: transform 400ms ease, box-shadow 400ms ease;
+}
+.post-body img:hover {
+  transform: scale(1.015);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+}
+
+// Back to top
+.back-to-top {
+  transition: all 250ms ease;
+  border-radius: 4px !important;
+  opacity: 0.9;
+}
+.back-to-top:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+// Pagination smooth
+.pagination .page-number, .pagination .extend {
+  transition: all 200ms ease;
+}
+
+// Blockquote
+blockquote { transition: border-color 300ms ease; }
+blockquote:hover { border-left-color: #c4672e; }
+
+// Headband gradient
+.headband {
+  background: linear-gradient(90deg, #d4783e, #e8a87c) !important;
+}
+
+// ======== Responsive ========
+@media (max-width: 991px) {
+  .site-nav { margin-top: 0; }
+  .menu .menu-item { margin: 0; display: block; }
+  .menu .menu-item a { display: block; padding: 10px 0; border-bottom: 1px solid #e0d6c6; }
+  .menu .menu-item a::after { display: none; } // hide animated underline on mobile
+}
+
+@media (max-width: 767px) {
+  .header { padding: 12px 0 0; }
+  .main { padding: 0 16px; }
+  .post { padding: 24px 0; }
+  .posts-collapse { padding: 16px 0; }
+  .category-all-page, .tag-all-page { padding: 16px 0; }
+  .posts-expand { padding-top: 0; }
+  .post-body { font-size: 14px; line-height: 1.7; }
+  .post-title { font-size: 1.3em; }
+}

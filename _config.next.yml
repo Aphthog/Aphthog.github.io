@@ -1,7 +1,12 @@
 # ========== NexT 主题配置 ==========
 
+# 自定义文件注入
+custom_file_path:
+  variable: source/_data/variables.styl
+  style: source/_data/styles.styl
+
 # 风格: Muse（极简）/ Mist（紧凑）/ Pisces（双栏） / Gemini（扁平）
-scheme: Pisces
+scheme: Gemini
 
 # ---------- 暗色模式 ----------
 darkmode: false
@@ -11,28 +16,28 @@ font:
   enable: true
   global:
     external: false
-    family: 'PingFang SC, Microsoft YaHei, Hiragino Sans GB, Noto Sans CJK SC, sans-serif'
-    size: 16px
+    family: '-apple-system, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif'
+    size: 15px
   title:
     external: false
-    family: 'PingFang SC, Microsoft YaHei, Noto Serif CJK SC, serif'
-    size: 24px
+    family: 'Georgia, Noto Serif SC, serif'
+    size: 26px
   headings:
     external: false
-    family: 'PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif'
+    family: 'Georgia, Noto Serif SC, PingFang SC, sans-serif'
   posts:
     external: false
-    family: 'PingFang SC, Microsoft YaHei, Noto Sans CJK SC, sans-serif'
-    size: 16px
+    family: '-apple-system, Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif'
+    size: 15px
   codes:
     external: false
-    family: 'Fira Code, Source Code Pro, Consolas, monospace'
-    size: 14px
+    family: 'JetBrains Mono, Fira Code, Consolas, monospace'
+    size: 13px
 
 # ---------- 配色 ----------
 theme_color:
-  light: "#4a6fa5"
-  dark: "#87cefa"
+  light: "#d4783e"
+  dark: "#c4672e"
 
 # ---------- 菜单 ----------
 menu:
@@ -43,19 +48,9 @@ menu:
 
 # ---------- 侧边栏 ----------
 sidebar:
+  display: remove
   position: left
-  display: post
   offset: 12
-  width: 280
-
-# ---------- 头像 ----------
-avatar:
-  rounded: true
-  rotated: false
-
-# ---------- 社交链接 ----------
-social:
-  GitHub: https://github.com/Aphthog || fab fa-github
 
 # ---------- 文章设置 ----------
 excerpt_description: true
@@ -67,7 +62,7 @@ auto_excerpt:
 reading_progress:
   enable: true
   position: top
-  color: "#888888"
+  color: "#d4783e"
   height: 2px
 
 # 文章元信息
@@ -77,6 +72,10 @@ post_meta:
   updated_at:
     enable: true
     another_day: true
+
+# ---------- 图片 ----------
+mediumzoom: true
+lazyload: true
 
 # ---------- 返回顶部 ----------
 back2top:
@@ -88,10 +87,6 @@ back2top:
 footer:
   since: 2026
   powered: false
-  # 备案号（ICP）
-  # beian:
-  #   enable: false
-  #   icp:
 
 # ---------- 代码块 ----------
 codeblock:
@@ -100,3 +95,11 @@ codeblock:
     enable: true
     show_result: true
     style: flat
+
+# ---------- 社交 ----------
+social:
+  GitHub: https://github.com/Aphthog || fab fa-github
+
+social_icons:
+  icons_only: false
+  transition: true

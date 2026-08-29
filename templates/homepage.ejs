@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camille</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f1ea;
+  color: #3a3028;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+.container {
+  width: 100%;
+  max-width: 780px;
+  padding: 0 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0 48px;
+}
+.site-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #d4783e;
+  text-decoration: none;
+  letter-spacing: 1.5px;
+}
+.header-nav { display: flex; gap: 20px; }
+.header-nav a {
+  font-size: 13px;
+  color: #9a8a78;
+  text-decoration: none;
+  transition: color 200ms;
+}
+.header-nav a:hover { color: #d4783e; }
+
+/* Hero */
+.hero {
+  text-align: center;
+  margin-bottom: 44px;
+  padding: 40px 0 32px;
+  border-bottom: 1px solid #e0d6c6;
+}
+.hero-title {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 24px;
+  font-weight: 400;
+  color: #3a3028;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+.hero-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b0a090;
+  letter-spacing: 0.3px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+.tab {
+  font-size: 13px;
+  color: #9a8a78;
+  background: none;
+  border: none;
+  padding: 0 0 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 200ms;
+}
+.tab:hover { color: #d4783e; }
+.tab.active { color: #d4783e; font-weight: 500; border-bottom: 1.5px solid #d4783e; }
+
+/* Article list */
+.section-content { display: none; }
+.section-content.active { display: block; }
+
+.article-item {
+  display: block;
+  padding: 20px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #e0d6c6;
+}
+.article-item:last-child { border-bottom: none; }
+.article-date {
+  font-size: 12px;
+  color: #b0a090;
+  margin-bottom: 3px;
+  letter-spacing: 0.3px;
+}
+.article-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-bottom: 3px;
+  transition: color 200ms;
+}
+.article-item:hover .article-title { color: #d4783e; }
+.article-excerpt {
+  font-size: 13px;
+  color: #9a8a78;
+  line-height: 1.5;
+}
+
+.empty-state {
+  padding: 40px 0;
+  color: #b0a090;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 48px 0 24px;
+  font-size: 12px;
+  color: #c0b8a8;
+}
+
+@media (max-width: 600px) {
+  .header { padding: 14px 0 28px; }
+  .hero { padding: 24px 0 20px; }
+  .hero-title { font-size: 20px; }
+  .tabs { gap: 16px; }
+  .article-item { padding: 16px 0; }
+}
+
+/* Interaction effects */
+html { scroll-behavior: smooth; }
+
+.header-nav a {
+  position: relative;
+  transition: color 200ms ease;
+}
+.header-nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #d4783e;
+  transition: width 250ms ease;
+}
+.header-nav a:hover::after {
+  width: 100%;
+}
+
+.article-item {
+  transition: all 250ms ease;
+}
+.article-item:hover {
+  padding-left: 8px;
+}
+.article-title { transition: color 200ms ease; }
+
+.tab { transition: all 250ms ease; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header class="header">
+    <a href="/" class="site-name">Camille</a>
+    <nav class="header-nav">
+      <a href="/">首页</a>
+      <a href="/archives/">归档</a>
+      <a href="/about/">关于</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div class="hero-title">写代码，按快门，偶尔写点东西</div>
+    <div class="hero-sub">技术笔记 · 摄影 · 随笔</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-section="tech">技术笔记</button>
+    <button class="tab" data-section="photo">摄影</button>
+    <button class="tab" data-section="essay">随笔</button>
+  </div>
+
+  <% ['tech', 'photo', 'essay'].forEach(function (id) { %>
+  <div class="section-content<%- id === 'tech' ? ' active' : '' %>" id="<%- id %>">
+    <% tabs[id].forEach(function (p) { %>
+    <a class="article-item" href="<%- p.url %>">
+      <div class="article-date"><%- p.date %></div>
+      <div class="article-title"><%- p.title %></div>
+      <div class="article-excerpt"><%- p.excerpt %></div>
+    </a>
+    <% }); %>
+    <% if (!tabs[id].length) { %>
+    <div class="empty-state">这里还没有文章</div>
+    <% } %>
+  </div>
+  <% }); %>
+
+  <div class="footer">© 2026 Camille</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+    document.getElementById(tab.dataset.section).classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>

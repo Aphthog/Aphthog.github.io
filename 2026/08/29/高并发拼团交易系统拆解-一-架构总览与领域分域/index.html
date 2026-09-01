@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="系列第 1 篇：拼团营销系统的边界划分、DDD 四层 + 三域的落地方式、10 张表的归属，以及人群标签 Bitmap 方案的内存账本与 MD5 取模的坑">
+<meta property="og:type" content="article">
+<meta property="og:title" content="高并发拼团交易系统拆解（一）：架构总览与领域分域">
+<meta property="og:url" content="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="系列第 1 篇：拼团营销系统的边界划分、DDD 四层 + 三域的落地方式、10 张表的归属，以及人群标签 Bitmap 方案的内存账本与 MD5 取模的坑">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-29T09:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="DDD">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="项目">
+<meta property="article:tag" content="高并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/","path":"2026/08/29/高并发拼团交易系统拆解-一-架构总览与领域分域/","title":"高并发拼团交易系统拆解（一）：架构总览与领域分域"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>高并发拼团交易系统拆解（一）：架构总览与领域分域 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="高并发拼团交易系统拆解（一）：架构总览与领域分域 | Camille">
+      <meta itemprop="description" content="系列第 1 篇：拼团营销系统的边界划分、DDD 四层 + 三域的落地方式、10 张表的归属，以及人群标签 Bitmap 方案的内存账本与 MD5 取模的坑">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          高并发拼团交易系统拆解（一）：架构总览与领域分域
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-29 09:00:00" itemprop="dateCreated datePublished" datetime="2026-08-29T09:00:00+00:00">2026-08-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">系列第 1 篇：拼团营销系统的边界划分、DDD 四层 + 三域的落地方式、10 张表的归属，以及人群标签 Bitmap 方案的内存账本与 MD5 取模的坑</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>上半年花了两三个月，完整实践了一个拼团营销交易系统：从营销活动、折扣试算、交易锁单，到结算回调、退款逆向的整条链路。这个系列用四篇文章做一次系统性的复盘——这一篇先讲架构和分域，后面三篇分别拆折扣试算、库存一致性、结算回调与退款。</p>
+<blockquote>
+<p>说明：工程基于小傅哥（bugstack.cn）开源的 DDD 拼团营销项目实践搭建，本系列的源码分析与踩坑总结来自我对整个工程的逐行阅读、本地调试与复盘。</p>
+</blockquote>
+<h2 id="先把系统边界画清楚"><a href="#先把系统边界画清楚" class="headerlink" title="先把系统边界画清楚"></a>先把系统边界画清楚</h2><p>这是一个<strong>拼团营销侧系统</strong>，不碰支付、不碰商品库存。它和上游交易商城的关系是：</p>
+<ul>
+<li>商城负责下单、支付、订单主流程；</li>
+<li>这边负责回答四个问题：<strong>活动能不能参加、优惠多少钱、队伍满没满、成团了通知谁</strong>。</li>
+</ul>
+<p>两边的衔接只有两条通道：商城支付成功后<strong>回调</strong>这边（结算），这边拼团状态变化后通过 HTTP&#x2F;MQ <strong>通知</strong>商城（成团、失败）。没有同步的跨系统事务，全靠回调 + 补偿。</p>
+<p>把边界画清楚的价值在后面处处体现：结算不用等支付结果（商城回调告诉你）、退款只管自己的状态机（拼团单&#x2F;交易单各自的状态组合）、库存只有”组队名额”这一个概念（商品库存是商城的事）。<strong>微服务设计里最重要的一步不是拆，而是想清楚哪些东西不归你管</strong>。</p>
+<h2 id="DDD-四层：依赖倒置怎么落地"><a href="#DDD-四层：依赖倒置怎么落地" class="headerlink" title="DDD 四层：依赖倒置怎么落地"></a>DDD 四层：依赖倒置怎么落地</h2><p>工程按 DDD 四层切 Maven 模块：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">group-buy-market-app             # 应用装配：启动类、配置、mybatis</span><br><span class="line">group-buy-market-trigger         # 触发层：HTTP 接口、定时任务、MQ 消费</span><br><span class="line">group-buy-market-domain          # 领域层：三个业务域，只有接口没有实现</span><br><span class="line">group-buy-market-infrastructure  # 基础设施：仓储实现、DAO、Redis、DCC</span><br><span class="line">group-buy-market-types           # 通用：枚举、异常、响应对象</span><br></pre></td></tr></table></figure>
+
+<p>关键的一条依赖规则：<strong>domain 不依赖 infrastructure</strong>。仓储接口（<code>ITradeRepository</code>、<code>IActivityRepository</code>、<code>ITagRepository</code>）定义在 domain，实现类（<code>TradeRepository</code> 等）放在 infrastructure 并打上 <code>@Repository</code>。领域服务里注入的是接口，Spring 在运行时把实现注进来。</p>
+<p>这样做的直接收益：领域逻辑里看不到任何 SQL 和 Redis 命令，<code>occupyTeamStock(teamStockKey, recoveryTeamStockKey, target, validTime)</code> 这样的方法签名说的是业务语言。哪天要把 Redis 换成本地缓存、把 MyBatis 换成 JPA，领域层一行不动。</p>
+<p>代价也有：接口和实现隔层跳转，读代码时要来回翻。我的体会是这套结构在项目超过 20 张表之后才开始”回本”——前期会嫌啰嗦，后期靠它续命。</p>
+<h2 id="三个域：按生命周期切，不按功能切"><a href="#三个域：按生命周期切，不按功能切" class="headerlink" title="三个域：按生命周期切，不按功能切"></a>三个域：按生命周期切，不按功能切</h2><p>domain 下按业务切成三个域：</p>
+<table>
+<thead>
+<tr>
+<th>业务域</th>
+<th>职责</th>
+<th>核心表</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>activity</code> 营销活动域</td>
+<td>活动配置、折扣试算、规则编排</td>
+<td>group_buy_activity、group_buy_discount、sc_sku_activity、sku</td>
+</tr>
+<tr>
+<td><code>tag</code> 人群标签域</td>
+<td>人群圈选、批量打标、Bitmap 查询</td>
+<td>crowd_tags、crowd_tags_detail、crowd_tags_job</td>
+</tr>
+<tr>
+<td><code>trade</code> 交易域</td>
+<td>锁单、结算、退款逆向、回调补偿</td>
+<td>group_buy_order、group_buy_order_list、notify_task</td>
+</tr>
+</tbody></table>
+<p>10 张表各归其主。分域的依据是<strong>生命周期</strong>，不是页面或接口：</p>
+<ul>
+<li>活动域的东西在<strong>运营配置活动时就定了</strong>——几折、满减多少、限定哪些人群、可以开几次团。变化频率低，读多写少；</li>
+<li>标签域是<strong>运营侧的批量数据活</strong>——跑批任务把人群写进 Bitmap，和用户实时行为无关；</li>
+<li>交易域处理<strong>用户实时的锁单-支付-退款流转</strong>，是整个系统并发压力和数据一致性压力的所在地。</li>
+</ul>
+<p>域间协作有一个值得展开的细节：<strong>跨域调用不发生在领域层之间</strong>。</p>
+<ul>
+<li><strong>trigger 层负责跨域编排</strong>。锁单入口的 Controller 注入的是两个域的领域服务接口——activity 域的试算服务（规则树）和 trade 域的锁单服务：先试算拿到价格和人群可见性结论，再转换成 trade 域自己的实体（<code>PayActivityEntity</code>&#x2F;<code>PayDiscountEntity</code>）传给锁单服务。编排本来就该在组装层做，领域服务互相不知道对方的存在。</li>
+<li><strong>trade 域内的活动校验走自己域的仓储</strong>。锁单责任链的第一关（活动可用性）注入的是 <code>ITradeRepository</code>，不是 activity 域的仓储；infrastructure 层的 <code>TradeRepository</code> 实现里用 DAO 直接查 <code>group_buy_activity</code> 表，并把 PO 转换成 <strong>trade 域自己的窄化实体</strong> <code>GroupBuyActivityEntity</code>——只挑交易需要的字段（限购次数、成团人数、有效期、状态、时间窗口）。这是一个防腐层（ACL）变体：activity 的模型变更只会影响 infrastructure 里的转换代码，不会侵入 trade 领域层。</li>
+</ul>
+<p>诚实的代价也要说：<code>TradeRepository</code> 直查了 activity 域的表——<strong>数据层面是同库共享的，隔离发生在模型和接口层面</strong>。这是单体期的务实取舍，微服务化时这一处查询要换成 activity 域的 RPC 接口或本地冗余数据。这才是后续拆微服务的真正伏笔：模型边界已经防腐，拆的时候只动 infrastructure。</p>
+<h2 id="tag-域深读：人群标签为什么用-Bitmap"><a href="#tag-域深读：人群标签为什么用-Bitmap" class="headerlink" title="tag 域深读：人群标签为什么用 Bitmap"></a>tag 域深读：人群标签为什么用 Bitmap</h2><p>营销活动经常只对特定人群开放（新客、某渠道用户）。判断”这个用户在不在人群里”，朴素方案是关系表 <code>crowd_tags_detail(tag_id, user_id)</code>，查询就是一条 <code>select ... where tag_id = ? and user_id = ?</code>。</p>
+<p>问题在于这个查询在<strong>试算接口的热路径上</strong>——每个试算请求都要查一次。批量打标时一条 insert 一条记录，100 万人的标签就是 100 万行。</p>
+<p>系统的方案是<strong>关系表 + Redis Bitmap 双写</strong>，查询走 Bitmap：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TagRepository.addCrowdTagsUserId —— 打标：关系表 + BitSet 双写</span></span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">    crowdTagsDetailDao.addCrowdTagsUserId(crowdTagsDetailReq);</span><br><span class="line">&#125; <span class="keyword">catch</span> (DuplicateKeyException ignore) &#123;</span><br><span class="line">    <span class="comment">// 忽略唯一索引冲突</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 获取BitSet</span></span><br><span class="line"><span class="type">RBitSet</span> <span class="variable">bitSet</span> <span class="operator">=</span> redisService.getBitSet(tagId);</span><br><span class="line">bitSet.set(redisService.getIndexFromUserId(userId), <span class="literal">true</span>);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ActivityRepository.isTagCrowdRange —— 查询：O(1)，不带任何 DB 往返</span></span><br><span class="line"><span class="type">RBitSet</span> <span class="variable">bitSet</span> <span class="operator">=</span> redisService.getBitSet(tagId);</span><br><span class="line"><span class="keyword">if</span> (!bitSet.isExists()) <span class="keyword">return</span> <span class="literal">true</span>;   <span class="comment">// 没配人群 = 不限制，直接放行</span></span><br><span class="line"><span class="keyword">return</span> bitSet.get(redisService.getIndexFromUserId(userId));</span><br></pre></td></tr></table></figure>
+
+<p>两个细节值得注意：</p>
+<ol>
+<li><code>DuplicateKeyException</code> 直接吞掉——批处理任务重跑时同一用户重复打标是常态，唯一索引兜底比先查后插干净；</li>
+<li><code>isExists()</code> 的 fallback 是 <code>true</code>（放行）——<strong>没有配置人群约束等于全员可参与</strong>，把”空配置”解释成最宽松的语义，避免运营少配一步把活动配死。</li>
+</ol>
+<h3 id="内存账本：这张-Bitmap-到底省没省内存"><a href="#内存账本：这张-Bitmap-到底省没省内存" class="headerlink" title="内存账本：这张 Bitmap 到底省没省内存"></a>内存账本：这张 Bitmap 到底省没省内存</h3><p>面试里我一定会被问”为什么用 Bitmap”，这里把账算清楚，因为答案没有想象中理所当然。</p>
+<p>用户到 offset 的映射用的是 MD5 取模：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// IRedisService.getIndexFromUserId</span></span><br><span class="line"><span class="type">MessageDigest</span> <span class="variable">md</span> <span class="operator">=</span> MessageDigest.getInstance(<span class="string">&quot;MD5&quot;</span>);</span><br><span class="line"><span class="type">byte</span>[] hashBytes = md.digest(userId.getBytes(StandardCharsets.UTF_8));</span><br><span class="line"><span class="type">BigInteger</span> <span class="variable">bigInt</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">BigInteger</span>(<span class="number">1</span>, hashBytes);</span><br><span class="line"><span class="comment">// 取模以确保索引在合理范围内</span></span><br><span class="line"><span class="keyword">return</span> bigInt.mod(BigInteger.valueOf(Integer.MAX_VALUE)).intValue();</span><br></pre></td></tr></table></figure>
+
+<p><strong>理想情况</strong>：如果用户 ID 能映射到紧凑的连续区间（比如自增序号 0~999999），100 万用户的标签位图 &#x3D; 100 万 bit ≈ <strong>125 KB</strong>。同样的 100 万行关系表，算上主键和 <code>(tag_id, user_id)</code> 唯一索引，几十 MB 起步——差两个数量级以上，”内存降低 80%+” 这种说法在这里完全站得住，甚至保守了。</p>
+<p><strong>现实情况</strong>：看上面那段代码，取模范围是 <code>Integer.MAX_VALUE</code> ≈ 21 亿。Redis bitmap 的大小由<strong>最大 offset</strong> 决定，不是用户数。MD5 均匀分布下，哪怕这个标签只有 1 个用户，他的 offset 也大概率落在几亿到二十几亿之间——这一个 bit 就把位图撑到 <code>offset / 8</code> ≈ <strong>几十到两百多 MB</strong>。用户越多，最大 offset 越逼近 21 亿，每个标签 key 稳定逼近 256 MB。</p>
+<p>也就是说，<strong>这套实现的收益在查询路径（O(1)、零 DB 压力），不在存储内存</strong>——除非把取模范围压缩（比如 mod 1000 万，单 key 上限压到 1.25 MB），或者建一层”用户 → 紧凑序号”的映射，或者换 RoaringBitmap 这类稀疏位图压缩结构。</p>
+<p>所以”用 Bitmap 省了 80% 内存”这句话在面试里我会先<strong>定义对比口径</strong>：对比的是”把标签明细全量拉到应用内存里做判断”的方案（100 万个 userId 的 Set，堆内存轻松上百 MB），位图方案应用侧只做一次 O(1) 查询、不加载明细——这个口径下降幅 80% 是保守的。同时主动讲出 MD5 大范围取模的坑和修复方向，比等面试官戳破要好得多。</p>
+<h2 id="面试追问预演"><a href="#面试追问预演" class="headerlink" title="面试追问预演"></a>面试追问预演</h2><p><strong>Q: 为什么用 DDD 四层，不直接 controller-service-dao 三层？</strong><br>A: 核心是依赖倒置——仓储接口在 domain，实现在 infrastructure，领域逻辑不依赖存储细节。项目小的时候三层更快，但这个系统的库存、幂等、状态机逻辑密度高，隔离存储细节后单测可以不起数据库直接测领域服务。</p>
+<p><strong>Q: 三个域怎么划分的？域之间怎么交互？</strong><br>A: 按生命周期切：活动域配置期定死、标签域运营跑批、交易域用户实时流转。交互上，跨域编排上移到 trigger 层（Controller 注入各域的领域服务接口）；域内的跨域读走自己域的仓储接口，跨域访问收敛在 infrastructure 实现里并做模型转换（防腐层变体）。数据层面同库共享是单体期取舍，微服务化时换成 RPC 接口。</p>
+<p><strong>Q: 人群标签为什么用 Bitmap？内存真的省吗？</strong><br>A: 省的是查询路径——O(1) 判断、无 DB 往返；存储上要先看 offset 映射：紧凑 ID 下 100 万人 125KB，但这套实现用 MD5 mod 21 亿，位图大小由最大 offset 决定，单 key 逼近 256MB，存储反而可能更大。修复方向是压缩取模范围或换 RoaringBitmap。</p>
+<p><strong>Q: 打标任务重跑会不会重复插数据？</strong><br>A: 关系表有 (tag_id, user_id) 唯一索引，<code>DuplicateKeyException</code> 直接吞掉；Bitmap 的 <code>set</code> 天然幂等。</p>
+<hr>
+<p>系列目录：</p>
+<ul>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">（一）架构总览与领域分域</a>（本篇）</li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/">（二）折扣试算与规则编排</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">（三）库存一致性与幂等</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/">（四）结算回调与退款逆向</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+              <a href="/tags/%E9%AB%98%E5%B9%B6%E5%8F%91/" rel="tag"># 高并发</a>
+              <a href="/tags/DDD/" rel="tag"># DDD</a>
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E5%9B%9B-%E8%B8%A9%E5%9D%91%E8%AE%B0/" rel="prev" title="RAG 服务搭建记录（四）：踩坑记">
+                  <i class="fa fa-angle-left"></i> RAG 服务搭建记录（四）：踩坑记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/" rel="next" title="高并发拼团交易系统拆解（二）：折扣试算与规则编排">
+                  高并发拼团交易系统拆解（二）：折扣试算与规则编排 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

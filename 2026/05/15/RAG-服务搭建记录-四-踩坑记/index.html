@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="七个 bug 的排查过程，从 segfault 到分数越界">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG 服务搭建记录（四）：踩坑记">
+<meta property="og:url" content="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E5%9B%9B-%E8%B8%A9%E5%9D%91%E8%AE%B0/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="七个 bug 的排查过程，从 segfault 到分数越界">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-05-15T14:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="debug">
+<meta property="article:tag" content="segfault">
+<meta property="article:tag" content="故障排查">
+<meta property="article:tag" content="踩坑">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E5%9B%9B-%E8%B8%A9%E5%9D%91%E8%AE%B0/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E5%9B%9B-%E8%B8%A9%E5%9D%91%E8%AE%B0/","path":"2026/05/15/RAG-服务搭建记录-四-踩坑记/","title":"RAG 服务搭建记录（四）：踩坑记"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>RAG 服务搭建记录（四）：踩坑记 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E5%9B%9B-%E8%B8%A9%E5%9D%91%E8%AE%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="RAG 服务搭建记录（四）：踩坑记 | Camille">
+      <meta itemprop="description" content="七个 bug 的排查过程，从 segfault 到分数越界">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RAG 服务搭建记录（四）：踩坑记
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-05-15 14:00:00" itemprop="dateCreated datePublished" datetime="2026-05-15T14:00:00+00:00">2026-05-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">七个 bug 的排查过程，从 segfault 到分数越界</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>这个项目实际编码时间不算长，但排查各种奇怪问题的时间至少占了一半。这篇文章完整记录遇到的坑和排查思路。</p>
+<h2 id="坑一：L2-距离当相似度分数用"><a href="#坑一：L2-距离当相似度分数用" class="headerlink" title="坑一：L2 距离当相似度分数用"></a>坑一：L2 距离当相似度分数用</h2><h3 id="现象"><a href="#现象" class="headerlink" title="现象"></a>现象</h3><p>第一次搜索完成后，感觉结果排序不对。”明显最相关的文档”排到了第 4、5 名，而不太相关的反而排前面。但也不是完全不相关——top-5 里的文档确实都和查询有关联。</p>
+<p>这种”好像有点相关但排序不对”的现象最迷惑人：如果完全不相关问题反而好找，这种半对半错的状态最容易让人怀疑是模型效果差。</p>
+<h3 id="排查"><a href="#排查" class="headerlink" title="排查"></a>排查</h3><p>加日志把 FAISS 返回的原始距离值打出来：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">查询 &quot;确定首句的方法有哪些&quot;</span><br><span class="line">候选 A（应该排第一）：距离 0.52</span><br><span class="line">候选 B（应该排第二）：距离 0.78</span><br><span class="line">候选 C（无关）：      距离 0.31  ← 排到了最前面</span><br></pre></td></tr></table></figure>
+
+<p>问题清楚了：FAISS 的 HNSW 索引用 L2 距离度量，返回的是<strong>距离</strong>——距离越小表示两个向量越接近。但代码里直接把距离当”相似度分数”排序，取最大值。距离最小的文档（最相似的）反而分数最低，排到末尾。</p>
+<h3 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h3><p>加一个负号把 L2 距离反转，让距离越小分数越高：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 之前</span></span><br><span class="line">scores = &#123;cid: -dist <span class="keyword">for</span> cid, dist <span class="keyword">in</span> results&#125;  <span class="comment"># 等等，就算加负号...</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 实际上原始代码是：</span></span><br><span class="line">scores = &#123;cid: dist <span class="keyword">for</span> cid, dist <span class="keyword">in</span> results&#125;</span><br><span class="line"><span class="built_in">sorted</span>(scores.items(), key=<span class="keyword">lambda</span> x: x[<span class="number">1</span>], reverse=<span class="literal">True</span>)  <span class="comment"># 取最大距离 = 最不相似的排第一</span></span><br></pre></td></tr></table></figure>
+
+<p>修复后：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">scores = &#123;cid: -dist <span class="keyword">for</span> cid, dist <span class="keyword">in</span> results&#125;  <span class="comment"># 距离负号 = 越小越相似分越高</span></span><br><span class="line"><span class="built_in">sorted</span>(scores.items(), key=<span class="keyword">lambda</span> x: x[<span class="number">1</span>], reverse=<span class="literal">True</span>)  <span class="comment"># 取最大 = 最相似排第一</span></span><br></pre></td></tr></table></figure>
+
+<p>不过有一个微妙之处：FAISS 的 search 方法返回的 top-K 已经是按距离<strong>从小到大</strong>排列的。也就是说召回集合已经是距离最小的 K 个了。负号反转只改变了这 K 个内部的排序顺序，并不会把不在 top-K 里的文档拉进来。所以之前的情况是”召回对了，排序反了”。</p>
+<p>更稳妥的做法是：召回 <code>k * 2</code> 个候选，然后统一反转分数重新排序——这样既修正排序，又把边缘候选纳入考量。</p>
+<h2 id="坑二：JSON-结构噪音"><a href="#坑二：JSON-结构噪音" class="headerlink" title="坑二：JSON 结构噪音"></a>坑二：JSON 结构噪音</h2><h3 id="现象-1"><a href="#现象-1" class="headerlink" title="现象"></a>现象</h3><p>索引构建完成后，搜一些简单的问题结果却不理想。比如搜”这段话意在说明什么”，返回的结果里混入了不少看起来无关的内容。</p>
+<h3 id="排查-1"><a href="#排查-1" class="headerlink" title="排查"></a>排查</h3><p>回头检查索引里的原始文本，发现 chunks 里存的文本是这样的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&#123;&quot;title&quot;: &quot;这段话意在说明什么&quot;, &quot;options&quot;: [&#123;&quot;text&quot;: &quot;A. 强调...&quot;, &quot;key&quot;: &quot;A&quot;&#125;, &#123;&quot;text&quot;: &quot;B. 指出...&quot;, &quot;key&quot;: &quot;B&quot;&#125;], &quot;key&quot;: &quot;B&quot;, &quot;answer&quot;: &quot;B&quot;, &quot;knowledge_point&quot;: &quot;确定首句&quot;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>—— 整个 JSON 字符串被直接传给了嵌入模型。嵌入模型编码时，<code>&quot;options&quot;: [</code>、<code>&quot;key&quot;:&quot;</code>、<code>&quot;knowledge_point&quot;:&quot;</code> 这些字段名和 JSON 语法符号也被当成自然语言编进了向量。整段文本大约 70% 是 JSON 结构，30% 才是实际的语义内容，信号被严重稀释。</p>
+<p>之所以出现这个问题，是因为原始导入代码为了省事，把 JSON 序列化后的字符串直接当成文档内容塞进去了。反正模型会”理解”文本，JSON 也是文本嘛——这个想法太天真了。</p>
+<h3 id="解决-1"><a href="#解决-1" class="headerlink" title="解决"></a>解决</h3><p>改为只提取纯文本字段拼接：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">parts = []</span><br><span class="line"><span class="keyword">if</span> title := item.get(<span class="string">&quot;title&quot;</span>):</span><br><span class="line">    parts.append(title)</span><br><span class="line"><span class="keyword">for</span> opt <span class="keyword">in</span> item.get(<span class="string">&quot;options&quot;</span>, []):</span><br><span class="line">    <span class="keyword">if</span> text := opt.get(<span class="string">&quot;text&quot;</span>):</span><br><span class="line">        parts.append(text)</span><br><span class="line"><span class="keyword">if</span> analysis := item.get(<span class="string">&quot;analysis&quot;</span>):</span><br><span class="line">    parts.append(analysis)</span><br><span class="line">text = <span class="string">&quot; &quot;</span>.join(parts)</span><br></pre></td></tr></table></figure>
+
+<p>key、answer、knowledge_point、source 等结构化数据作为 metadata 保存，不参与编码但随搜索结果返回。做了一个 HTTP 导入脚本，每批 50 条通过 API 上传：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">POST /tenants/&#123;name&#125;/index</span><br><span class="line">&#123;&quot;texts&quot;: [...], &quot;metadatas&quot;: [...]&#125;</span><br></pre></td></tr></table></figure>
+
+<p>清洗后的文本在导入时自动做语义切分，切成 300~1000 字符的 chunk，每个 chunk 携带原始 metadata 用于结果展示和过滤。</p>
+<h2 id="坑三：sentence-transformers-segfault"><a href="#坑三：sentence-transformers-segfault" class="headerlink" title="坑三：sentence-transformers segfault"></a>坑三：sentence-transformers segfault</h2><h3 id="现象-2"><a href="#现象-2" class="headerlink" title="现象"></a>现象</h3><p>用 sentence-transformers 加载 bge-m3：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> sentence_transformers <span class="keyword">import</span> SentenceTransformer</span><br><span class="line">model = SentenceTransformer(<span class="string">&quot;BAAI/bge-m3&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<p>运行到第二次编码时，进程突然消失——没有 traceback、没有异常、没有日志。Windows 的事件查看器里也没有有用信息。直接人间蒸发。</p>
+<h3 id="排查-2"><a href="#排查-2" class="headerlink" title="排查"></a>排查</h3><p>这不是 Python 层面的异常——如果是 Python 异常一定能捕获到。整个 Python 解释器被操作系统强制终止，说明是 C 层面的段错误（segfault）。sentence-transformers 内部使用了多线程来加载模型和探测硬件，在某些 Windows 环境下，这些线程在访问 C 扩展的共享资源时会出现竞争条件，触发访问违例。</p>
+<p>尝试过的一些方法：</p>
+<ul>
+<li>升级&#x2F;降级 sentence-transformers 版本 → 无效</li>
+<li>设置环境变量控制线程数 → 无效</li>
+<li>换用不同 Python 版本 → 无效</li>
+</ul>
+<h3 id="解决-2"><a href="#解决-2" class="headerlink" title="解决"></a>解决</h3><p>放弃 sentence-transformers，改用 transformers 库直连 XLMRobertaModel：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> transformers <span class="keyword">import</span> XLMRobertaModel, AutoTokenizer</span><br><span class="line"></span><br><span class="line"><span class="variable language_">self</span>._tokenizer = AutoTokenizer.from_pretrained(snapshot_path)</span><br><span class="line"><span class="variable language_">self</span>._base_model = XLMRobertaModel.from_pretrained(snapshot_path)</span><br><span class="line"><span class="variable language_">self</span>._base_model = <span class="variable language_">self</span>._base_model.to(<span class="variable language_">self</span>._device)</span><br><span class="line"><span class="variable language_">self</span>._base_model.<span class="built_in">eval</span>()</span><br><span class="line"></span><br><span class="line"><span class="comment"># 手动编码</span></span><br><span class="line">encoded = <span class="variable language_">self</span>._tokenizer(texts, padding=<span class="literal">True</span>, truncation=<span class="literal">True</span>, return_tensors=<span class="string">&#x27;pt&#x27;</span>, max_length=<span class="number">8192</span>)</span><br><span class="line">encoded = &#123;k: v.to(<span class="variable language_">self</span>._device) <span class="keyword">for</span> k, v <span class="keyword">in</span> encoded.items()&#125;</span><br><span class="line"><span class="keyword">with</span> torch.no_grad():</span><br><span class="line">    outputs = <span class="variable language_">self</span>._base_model(**encoded)</span><br><span class="line">dense_vec = outputs.last_hidden_state[:, <span class="number">0</span>]</span><br><span class="line">dense_vec = dense_vec / dense_vec.norm(dim=<span class="number">1</span>, keepdim=<span class="literal">True</span>).clamp(<span class="built_in">min</span>=<span class="number">1e-12</span>)</span><br></pre></td></tr></table></figure>
+
+<p>代码量从两行变成了约 30 行，但完全规避了 sentence-transformers 的多线程崩溃问题。之后再也没有出现过无故崩溃的情况。</p>
+<p>代价是手动处理了一些 sentence-transformers 自动完成的事情：L2 归一化、稀疏线性层的加载、设备管理等。但也正因为自己管理这些，后面迁移到 CUDA 和 FP16 变得更可控了。</p>
+<h2 id="坑四：Reranker-也-segfault"><a href="#坑四：Reranker-也-segfault" class="headerlink" title="坑四：Reranker 也 segfault"></a>坑四：Reranker 也 segfault</h2><h3 id="现象-3"><a href="#现象-3" class="headerlink" title="现象"></a>现象</h3><p>解决了编码器的 segfault 后，加载 reranker（bge-reranker-v2-m3）时又崩了。同样的问题——进程消失，没有错误信息。</p>
+<h3 id="排查-3"><a href="#排查-3" class="headerlink" title="排查"></a>排查</h3><p>分析显存和内存占用：</p>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>FP32 占用</th>
+<th>FP16 占用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>bge-m3 权重</td>
+<td>~4.2GB</td>
+<td>~2.1GB</td>
+</tr>
+<tr>
+<td>bge-reranker-v2-m3 权重</td>
+<td>~4.2GB</td>
+<td>~2.1GB</td>
+</tr>
+<tr>
+<td>总计</td>
+<td>~8.4GB</td>
+<td>~4.2GB</td>
+</tr>
+</tbody></table>
+<p>RTX 4060 Laptop 有 8GB 显存，FP32 两个模型加起来 8.4GB——超了。但为什么在 CPU 上也崩？CPU 上两个 FP32 模型大约 8.4GB，加上中间激活值，可能突破物理内存限制或者触发了 Windows 的某个进程内存限制。</p>
+<h3 id="解决-3"><a href="#解决-3" class="headerlink" title="解决"></a>解决</h3><p>FP16 加载：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">model = model.half().to(device)  <span class="comment"># 转为 FP16 再送到 GPU</span></span><br></pre></td></tr></table></figure>
+
+<p>两个模型加起来 4.2GB，在 8GB 显存上绰绰有余。同时也加了保护逻辑：如果当前设备是 CPU（没有 GPU 可用），跳过 reranker 加载，不影响主检索流程：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> device == <span class="string">&#x27;cpu&#x27;</span>:</span><br><span class="line">    logger.warning(<span class="string">&quot;CPU 模式下跳过 reranker&quot;</span>)</span><br><span class="line">    <span class="variable language_">self</span>._reranker_pipeline = <span class="literal">False</span></span><br><span class="line">    <span class="keyword">return</span></span><br></pre></td></tr></table></figure>
+
+<p>事后反思，之前尝试的 FlagReranker 库 segfault 很可能也是同样的问题——FP32 超显存，而不是库本身不能工作。</p>
+<h2 id="坑五：从-CPU-换到-GPU-后-reranker-在-CPU-又崩"><a href="#坑五：从-CPU-换到-GPU-后-reranker-在-CPU-又崩" class="headerlink" title="坑五：从 CPU 换到 GPU 后 reranker 在 CPU 又崩"></a>坑五：从 CPU 换到 GPU 后 reranker 在 CPU 又崩</h2><h3 id="现象-4"><a href="#现象-4" class="headerlink" title="现象"></a>现象</h3><p>重启机器后 GPU 驱动需要重新初始化，在 CPU 模式下测试 reranker，结果再次 segfault。</p>
+<h3 id="排查-4"><a href="#排查-4" class="headerlink" title="排查"></a>排查</h3><p>这和前一个坑不同——这次是确实没有 GPU 可用，硬要在 CPU 上加载。CPU 上加载 2GB+ 的模型在 Windows 下可能遇到内存分配的问题。在 Linux 上同样的操作是正常的，怀疑是 Windows 的内存分配策略和某些 C 扩展的兼容性问题。</p>
+<h3 id="解决-4"><a href="#解决-4" class="headerlink" title="解决"></a>解决</h3><p>GPU 驱动加载完成后（RTX 4060 可用），一切正常。最终结论：</p>
+<ul>
+<li>CPU 模式跳过 reranker（避免崩溃）</li>
+<li>GPU 模式用 FP16 加载 reranker（正常运行）</li>
+<li>模型的设备选择和嵌入器一致（都是 CUDA 或都是 CPU）</li>
+</ul>
+<h2 id="坑六：transformers-新版联网检查"><a href="#坑六：transformers-新版联网检查" class="headerlink" title="坑六：transformers 新版联网检查"></a>坑六：transformers 新版联网检查</h2><h3 id="现象-5"><a href="#现象-5" class="headerlink" title="现象"></a>现象</h3><p>bge-m3 和 reranker 明明已经在 HuggingFace 缓存目录里了，但 <code>from_pretrained</code> 还是报错——连接 <code>hf-mirror.com</code> 失败。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">requests.exceptions.ProxyError: Cannot connect to proxy.</span><br><span class="line">  Connecting to hf-mirror.com:443 failed</span><br></pre></td></tr></table></figure>
+
+<h3 id="排查-5"><a href="#排查-5" class="headerlink" title="排查"></a>排查</h3><p>报错堆栈显示，问题出在 transformers 的 <code>_patch_mistral_regex</code> 这个函数：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># transformers/tokenization_utils_base.py:2442</span></span><br><span class="line">_is_local <span class="keyword">or</span> (<span class="keyword">not</span> _is_local <span class="keyword">and</span> is_base_mistral(pretrained_model_name_or_path))</span><br></pre></td></tr></table></figure>
+
+<p>这个函数在 <code>from_pretrained</code> 中被调用，它先检查路径是不是本地路径。如果传的是模型名（如 <code>&quot;BAAI/bge-m3&quot;</code>），它会调用 <code>model_info()</code> API 去 HuggingFace 服务器查询模型信息，确认是不是 Mistral 模型。即使传了 <code>local_files_only=True</code> 也绕不过这个检查——因为它发生得更早，在 <code>local_files_only</code> 逻辑被执行之前。</p>
+<h3 id="解决-5"><a href="#解决-5" class="headerlink" title="解决"></a>解决</h3><p>改用本地缓存快照路径直接加载：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">cache_dir = os.environ.get(<span class="string">&#x27;TRANSFORMERS_CACHE&#x27;</span>)</span><br><span class="line">model_cache = os.path.join(cache_dir, <span class="string">&#x27;models--BAAI--bge-m3&#x27;</span>)</span><br><span class="line">snaps = os.path.join(model_cache, <span class="string">&#x27;snapshots&#x27;</span>)</span><br><span class="line">snapshot_path = <span class="built_in">next</span>(</span><br><span class="line">    os.path.join(snaps, d) <span class="keyword">for</span> d <span class="keyword">in</span> os.listdir(snaps)</span><br><span class="line">    <span class="keyword">if</span> os.path.isdir(os.path.join(snaps, d))</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="variable language_">self</span>._tokenizer = AutoTokenizer.from_pretrained(snapshot_path)</span><br><span class="line"><span class="variable language_">self</span>._base_model = XLMRobertaModel.from_pretrained(snapshot_path)</span><br></pre></td></tr></table></figure>
+
+<p>由于传的是本地路径（以 <code>E:\\</code> 开头），<code>_is_local</code> 为 True，<code>model_info()</code> 调用被跳过，完全离线加载。而且速度更快——省掉了网络请求和模型信息解析的开销。</p>
+<h2 id="坑七：Reranker-分数计算"><a href="#坑七：Reranker-分数计算" class="headerlink" title="坑七：Reranker 分数计算"></a>坑七：Reranker 分数计算</h2><h3 id="现象-6"><a href="#现象-6" class="headerlink" title="现象"></a>现象</h3><p>reranker 第一次推理时报 <code>IndexError: index 1 is out of bounds for dimension 1 with size 1</code>。</p>
+<h3 id="排查-6"><a href="#排查-6" class="headerlink" title="排查"></a>排查</h3><p>代码原来是这样写的：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">logits = outputs.logits  <span class="comment"># 假设 shape 是 (batch, 2)</span></span><br><span class="line">scores = torch.softmax(logits, dim=<span class="number">1</span>)[:, <span class="number">1</span>].cpu().numpy()</span><br></pre></td></tr></table></figure>
+
+<p>假设模型输出两个 logit（不相关、相关），用 softmax 归一化后取”相关”类的概率。但 bge-reranker-v2-m3 的配置文件里只有一个 label：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;id2label&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span><span class="attr">&quot;0&quot;</span><span class="punctuation">:</span> <span class="string">&quot;LABEL_0&quot;</span><span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;label2id&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span><span class="attr">&quot;LABEL_0&quot;</span><span class="punctuation">:</span> <span class="number">0</span><span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>说明是单标签分类，输出 shape 是 <code>(batch, 1)</code> 而不是 <code>(batch, 2)</code>。<code>[:, 1]</code> 自然就越界了。</p>
+<h3 id="解决-6"><a href="#解决-6" class="headerlink" title="解决"></a>解决</h3><p>根据输出维度动态选择分数计算方式：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> logits.shape[<span class="number">1</span>] == <span class="number">1</span>:</span><br><span class="line">    <span class="comment"># 单标签：sigmoid 映射到 (0, 1)</span></span><br><span class="line">    scores = torch.sigmoid(logits.squeeze(-<span class="number">1</span>)).cpu().numpy()</span><br><span class="line"><span class="keyword">else</span>:</span><br><span class="line">    <span class="comment"># 二分类：softmax 取正类概率</span></span><br><span class="line">    scores = torch.softmax(logits, dim=<span class="number">1</span>)[:, <span class="number">1</span>].cpu().numpy()</span><br></pre></td></tr></table></figure>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><table>
+<thead>
+<tr>
+<th>坑</th>
+<th>根因</th>
+<th>修复</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>排序反了</td>
+<td>L2 距离直接当分数</td>
+<td>负号反转</td>
+</tr>
+<tr>
+<td>搜索噪音</td>
+<td>JSON 结构混入编码</td>
+<td>只传纯文本</td>
+</tr>
+<tr>
+<td>sentence-transformers segfault</td>
+<td>多线程 C 级崩溃</td>
+<td>transformers 直连</td>
+</tr>
+<tr>
+<td>reranker segfault (GPU)</td>
+<td>FP32 超显存</td>
+<td>FP16 加载</td>
+</tr>
+<tr>
+<td>reranker segfault (CPU)</td>
+<td>Windows 内存分配问题</td>
+<td>CPU 模式跳过</td>
+</tr>
+<tr>
+<td>模型加载失败</td>
+<td>transformers 联网检查</td>
+<td>本地 snapshot 路径</td>
+</tr>
+<tr>
+<td>reranker 分数越界</td>
+<td>假设二分类输出</td>
+<td>sigmoid 适配单 label</td>
+</tr>
+</tbody></table>
+<p>几个教训：</p>
+<ol>
+<li><strong>不要假设库的行为</strong>——sentence-transformers 在 Linux 上很好，在 Windows 上会崩。不知道的事情，需要提前验证。</li>
+<li><strong>注意数据类型的内存占用</strong>——FP32 到 FP16 不止是精度问题，可能直接决定程序能不能跑。</li>
+<li><strong>不要信”名字叫距离就不是分数”这种直觉</strong>——API 的返回值语义一定要读文档确认。</li>
+<li><strong>国产网络环境下，离线加载永远比在线加载靠谱</strong>——用本地路径，不依赖镜像。</li>
+</ol>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/debug/" rel="tag"># debug</a>
+              <a href="/tags/segfault/" rel="tag"># segfault</a>
+              <a href="/tags/%E8%B8%A9%E5%9D%91/" rel="tag"># 踩坑</a>
+              <a href="/tags/%E6%95%85%E9%9A%9C%E6%8E%92%E6%9F%A5/" rel="tag"># 故障排查</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%89-%E6%A3%80%E7%B4%A2%E4%B8%8E%E7%B2%BE%E6%8E%92/" rel="prev" title="RAG 服务搭建记录（三）：检索与精排">
+                  <i class="fa fa-angle-left"></i> RAG 服务搭建记录（三）：检索与精排
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/" rel="next" title="高并发拼团交易系统拆解（一）：架构总览与领域分域">
+                  高并发拼团交易系统拆解（一）：架构总览与领域分域 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

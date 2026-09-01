@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="技术选型、架构设计、FAISS vs 其他索引方案">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG 服务搭建记录（一）：从零开始">
+<meta property="og:url" content="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%80-%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="技术选型、架构设计、FAISS vs 其他索引方案">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-05-15T09:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="技术选型">
+<meta property="article:tag" content="架构">
+<meta property="article:tag" content="项目">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%80-%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%80-%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B/","path":"2026/05/15/RAG-服务搭建记录-一-从零开始/","title":"RAG 服务搭建记录（一）：从零开始"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>RAG 服务搭建记录（一）：从零开始 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%80-%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="RAG 服务搭建记录（一）：从零开始 | Camille">
+      <meta itemprop="description" content="技术选型、架构设计、FAISS vs 其他索引方案">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RAG 服务搭建记录（一）：从零开始
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-05-15 09:00:00" itemprop="dateCreated datePublished" datetime="2026-05-15T09:00:00+00:00">2026-05-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">技术选型、架构设计、FAISS vs 其他索引方案</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>去年年底开始做一个语义搜索的小项目，目标是搭建一个轻量的 RAG 服务，能够对文档做稠密+稀疏混合检索，再用 cross-encoder 精排。前后断断续续写了一段时间，中间踩了不少坑，记录一下整个过程。</p>
+<h2 id="为什么做"><a href="#为什么做" class="headerlink" title="为什么做"></a>为什么做</h2><p>市面上有不少 RAG 方案，但大多偏向”大模型+知识库问答”的场景——接一个 LLM，搭一个向量数据库，再做问答链路。这类方案部署重、依赖多、成本高。我想要的更纯粹——<strong>只做检索，不涉及生成</strong>。</p>
+<p>具体来说有这几个需求：</p>
+<ul>
+<li><strong>纯检索</strong>：不需要 LLM 做问答，专注在”搜得准”上面</li>
+<li><strong>混合检索</strong>：既要语义匹配（搜意思相近但用词不同的内容），也要关键词命中（搜包含特定术语的内容）</li>
+<li><strong>本地运行</strong>：不依赖外部服务，一台带 GPU 的笔记本就能跑起来</li>
+<li><strong>多租户</strong>：不同的数据集需要隔离存储和检索</li>
+<li><strong>HTTP API</strong>：方便其他应用和前端调用</li>
+</ul>
+<p>所以这是一个非常聚焦的检索服务，不做对话、不做生成、不做知识库问答。纯搜索。</p>
+<h2 id="嵌入模型选型"><a href="#嵌入模型选型" class="headerlink" title="嵌入模型选型"></a>嵌入模型选型</h2><p>嵌入模型负责把文本变成向量，是整个检索系统的基础。选型时对比了几个方案：</p>
+<h3 id="sentence-transformers-all-MiniLM-L6-v2"><a href="#sentence-transformers-all-MiniLM-L6-v2" class="headerlink" title="sentence-transformers&#x2F;all-MiniLM-L6-v2"></a>sentence-transformers&#x2F;all-MiniLM-L6-v2</h3><p>轻量（~80MB），速度快，英文效果好。但中文效果一般，而且输出维度只有 384，对细粒度语义的表示能力有限。pass。</p>
+<h3 id="BAAI-bge-large-zh-v1-5"><a href="#BAAI-bge-large-zh-v1-5" class="headerlink" title="BAAI&#x2F;bge-large-zh-v1.5"></a>BAAI&#x2F;bge-large-zh-v1.5</h3><p>专门面向中文的嵌入模型，1024 维输出，中文效果很好。但只支持稠密向量，没有稀疏能力。依赖 sentence-transformers 库加载，这个库在 Windows 上有稳定性问题（后面踩坑篇细说）。</p>
+<h3 id="BAAI-bge-m3（最终选择）"><a href="#BAAI-bge-m3（最终选择）" class="headerlink" title="BAAI&#x2F;bge-m3（最终选择）"></a>BAAI&#x2F;bge-m3（最终选择）</h3><p>bge-m3 是一个多语言、多功能（Multi-task、Multi-lingual、Multi-dimension）的嵌入模型，它的特殊之处在于<strong>同一个模型能同时输出稠密向量和稀疏向量</strong>。</p>
+<p>为什么这很重要？纯稠密检索依赖”语义压缩”，把整段文本压到一个固定长度的向量里，查询时找向量最近邻。这对于同义改写、语义相近的内容效果很好，但对于关键词精确匹配——比如搜”确定首句”就希望结果里一定有这个短语——纯稠密的方式可能会漏掉。稀疏向量正好补充了这个短板，它本质上是一个词汇权重向量，每个 token 的位置记录了该 token 对文本语义的贡献度，做检索时算的是词汇级别的交集。</p>
+<p>bge-m3 同时输出 1024 维稠密向量和 65536 维稀疏向量，前向一次就够了，不需要维护两套独立的编码管线。</p>
+<h3 id="BAAI-bge-reranker-v2-m3"><a href="#BAAI-bge-reranker-v2-m3" class="headerlink" title="BAAI&#x2F;bge-reranker-v2-m3"></a>BAAI&#x2F;bge-reranker-v2-m3</h3><p>在初排之上加了一个精排层。bge-reranker-v2-m3 是一个 cross-encoder，把查询和文档拼成一对输入，输出一个相关性分数。双编码器把查询和文档独立编码，两者之间没有交互，cross-encoder 则让它们在注意力层直接交互，打分更准。代价是慢——每对文本都要过一次模型，所以只对粗召回的前几名做精排。</p>
+<h2 id="向量索引选型"><a href="#向量索引选型" class="headerlink" title="向量索引选型"></a>向量索引选型</h2><p>选型时主要考虑的是在笔记本上本地运行，排除了需要部署独立服务的方案（Milvus、Qdrant、Elasticsearch 等）。</p>
+<h3 id="FAISS"><a href="#FAISS" class="headerlink" title="FAISS"></a>FAISS</h3><p>Meta 开源的向量检索库，C++ 实现、Python 绑定，性能非常好。支持多种索引结构：暴力（Flat）、倒排（IVF）、量化（PQ）、图（HNSW）等。</p>
+<p>这里选的是 IndexHNSWFlat。HNSW（Hierarchical Navigable Small World）是一种基于图的近似最近邻索引，建图时每个向量作为图中的一个节点，M 参数控制最大连接数（设 32），搜索时从顶层图开始逐层向下贪心遍历。它的特点是搜索速度随数据量增长呈对数增长，在百万级数据量下能做到毫秒级响应。</p>
+<p>建图参数 efConstruction（设 200）控制建图时的搜索宽度，值越大图质量越高但建图越慢。搜索参数 efSearch（设 512）控制搜索时的宽度，值越大召回越准但搜索越慢。</p>
+<p>FAISS 用 L2 距离做度量，如果向量做过 L2 归一化，L2 距离等价于余弦相似度（因为 ||a-b||² &#x3D; 2 - 2cos(a,b)），所以代码里在入库和查询时都调用 <code>faiss.normalize_L2()</code> 做了归一化。</p>
+<p>稀疏向量维度 65536，不适合用 FAISS，直接用 scipy.sparse.csr_matrix 存成 npz 文件，检索时暴力算内积。因为数据量不大（几百到万级别），暴力扫描的开销可以接受。</p>
+<h2 id="整体架构"><a href="#整体架构" class="headerlink" title="整体架构"></a>整体架构</h2><p>最终的项目结构是这样的：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">rag-service/</span><br><span class="line">├── rag_service/</span><br><span class="line">│   ├── __init__.py</span><br><span class="line">│   ├── embedder.py    # bge-m3 编码</span><br><span class="line">│   ├── indexer.py     # FAISS 索引管理</span><br><span class="line">│   ├── retriever.py   # 混合检索 + reranker</span><br><span class="line">│   ├── service.py     # 统一入口</span><br><span class="line">│   ├── chunker.py     # 文本语义切分</span><br><span class="line">│   ├── types.py       # 数据模型</span><br><span class="line">│   └── errors.py      # 错误定义</span><br><span class="line">├── server.py          # FastAPI HTTP 服务</span><br><span class="line">├── data/</span><br><span class="line">│   └── rag_indexes/   # 索引持久化目录</span><br><span class="line">└── pyproject.toml</span><br></pre></td></tr></table></figure>
+
+<p>索引流程：</p>
+<ol>
+<li>文档进入 → 语义切分器切成 300~1000 字符的块（chunk）</li>
+<li>每个块经 bge-m3 编码，同时得到稠密向量和稀疏向量</li>
+<li>稠密向量建 FAISS HNSW 索引、持久化到磁盘</li>
+<li>稀疏向量存为 npz 文件</li>
+<li>块的原始文本和 metadata 存入 JSONL</li>
+</ol>
+<p>搜索流程：</p>
+<ol>
+<li>查询文字经 bge-m3 编码</li>
+<li>稠密通道：FAISS 召回 top-100</li>
+<li>稀疏通道：暴力内积召回 top-100</li>
+<li>两个通道的分数各自 min-max 归一化</li>
+<li>加权融合（dense 0.7 + sparse 0.3）</li>
+<li>取 top-50 候选，reranker 精排 top-5</li>
+<li>返回最终 top-K</li>
+</ol>
+<p>所有服务在单进程中运行，模型加载后常驻显存。好处是简单、部署成本低，缺点是横向扩展能力有限——不过对于个人项目和中规模数据集完全够用。</p>
+<p>下一篇详细讲 bge-m3 的双通道嵌入和 FAISS 索引构建的实现细节。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/%E6%8A%80%E6%9C%AF%E9%80%89%E5%9E%8B/" rel="tag"># 技术选型</a>
+              <a href="/tags/%E6%9E%B6%E6%9E%84/" rel="tag"># 架构</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/05/09/Java-%E6%B3%9B%E5%9E%8B%E5%85%A5%E9%97%A8/" rel="prev" title="Java 泛型入门">
+                  <i class="fa fa-angle-left"></i> Java 泛型入门
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E5%B5%8C%E5%85%A5%E4%B8%8E%E7%B4%A2%E5%BC%95/" rel="next" title="RAG 服务搭建记录（二）：嵌入与索引">
+                  RAG 服务搭建记录（二）：嵌入与索引 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

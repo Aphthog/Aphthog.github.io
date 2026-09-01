@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="bge-m3 双通道编码、FAISS HNSW 构建、多租户持久化">
+<meta property="og:type" content="article">
+<meta property="og:title" content="RAG 服务搭建记录（二）：嵌入与索引">
+<meta property="og:url" content="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E5%B5%8C%E5%85%A5%E4%B8%8E%E7%B4%A2%E5%BC%95/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="bge-m3 双通道编码、FAISS HNSW 构建、多租户持久化">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-05-15T10:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="FAISS">
+<meta property="article:tag" content="RAG">
+<meta property="article:tag" content="bge-m3">
+<meta property="article:tag" content="嵌入">
+<meta property="article:tag" content="索引">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E5%B5%8C%E5%85%A5%E4%B8%8E%E7%B4%A2%E5%BC%95/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E5%B5%8C%E5%85%A5%E4%B8%8E%E7%B4%A2%E5%BC%95/","path":"2026/05/15/RAG-服务搭建记录-二-嵌入与索引/","title":"RAG 服务搭建记录（二）：嵌入与索引"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>RAG 服务搭建记录（二）：嵌入与索引 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E5%B5%8C%E5%85%A5%E4%B8%8E%E7%B4%A2%E5%BC%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="RAG 服务搭建记录（二）：嵌入与索引 | Camille">
+      <meta itemprop="description" content="bge-m3 双通道编码、FAISS HNSW 构建、多租户持久化">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          RAG 服务搭建记录（二）：嵌入与索引
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-05-15 10:00:00" itemprop="dateCreated datePublished" datetime="2026-05-15T10:00:00+00:00">2026-05-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">bge-m3 双通道编码、FAISS HNSW 构建、多租户持久化</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><h2 id="从句子嵌入到双通道编码"><a href="#从句子嵌入到双通道编码" class="headerlink" title="从句子嵌入到双通道编码"></a>从句子嵌入到双通道编码</h2><p>bge-m3 基于 XLMRoberta，这是一个跨语言的 transformer 模型。标准的嵌入做法是取最后一层 CLS token 的输出作为句子的表示向量，bge-m3 在此基础上加了一条稀疏编码的支路，形成双通道输出。</p>
+<h3 id="稠密向量"><a href="#稠密向量" class="headerlink" title="稠密向量"></a>稠密向量</h3><p>取 XLMRoberta 最后一层输出的 CLS token 向量（维度 1024），做 L2 归一化。这是嵌入模型的”标准做法”——把整个句子的语义压缩到一个固定长度的稠密向量里。两个句子语义越接近，它们的向量在空间中的距离就越近。</p>
+<p>代码实现很直接：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">outputs = <span class="variable language_">self</span>._base_model(**encoded)           <span class="comment"># XLMRoberta 前向</span></span><br><span class="line">dense_vec = outputs.last_hidden_state[:, <span class="number">0</span>]     <span class="comment"># CLS token</span></span><br><span class="line">dense_vec = dense_vec / dense_vec.norm(dim=<span class="number">1</span>, keepdim=<span class="literal">True</span>).clamp(<span class="built_in">min</span>=<span class="number">1e-12</span>)</span><br></pre></td></tr></table></figure>
+
+<p><code>clamp(min=1e-12)</code> 防止除零——虽然实际中几乎不会发生，但安全处理是个好习惯。</p>
+<h3 id="稀疏向量"><a href="#稀疏向量" class="headerlink" title="稀疏向量"></a>稀疏向量</h3><p>bge-m3 在 transformer 之上加了一个 <code>sparse_linear</code> 线性层，作用是把每个 token 位置的隐层向量（1024 维）映射成一个标量分数，代表这个 token 对句子语义的重要程度。</p>
+<p>具体做法是每个 token 的隐层经过 <code>nn.Linear(1024, 1)</code> 变成 1 个分数，经过 ReLU 激活去掉负值（负的贡献度没有意义），然后对同一个 token ID（同一个词）的所有出现位置取 max-pool：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">sparse_scores = torch.relu(<span class="variable language_">self</span>._sparse_linear(hidden).squeeze(-<span class="number">1</span>))</span><br><span class="line"><span class="comment"># sparse_scores: (batch, seq_len) — 每个 token 一个分数</span></span><br><span class="line"><span class="comment"># input_ids:    (batch, seq_len) — 每个位置的 token ID</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> b <span class="keyword">in</span> <span class="built_in">range</span>(sparse_scores.shape[<span class="number">0</span>]):</span><br><span class="line">    row_scores = sparse_scores[b]</span><br><span class="line">    row_ids = input_ids[b]</span><br><span class="line">    mask = row_scores &gt; <span class="number">0</span></span><br><span class="line">    <span class="keyword">if</span> mask.<span class="built_in">any</span>():</span><br><span class="line">        tok_ids = row_ids[mask].tolist()</span><br><span class="line">        weights = row_scores[mask].tolist()</span><br><span class="line">        <span class="comment"># max-pool 去重</span></span><br><span class="line">        vec = &#123;&#125;</span><br><span class="line">        <span class="keyword">for</span> tid, w <span class="keyword">in</span> <span class="built_in">zip</span>(tok_ids, weights):</span><br><span class="line">            <span class="keyword">if</span> w &gt; vec.get(tid, <span class="number">0</span>):</span><br><span class="line">                vec[tid] = w</span><br></pre></td></tr></table></figure>
+
+<p>最终得到的稀疏向量维度是词汇表大小（bge-m3 的词表是 250002，但源码里 sparse_dim 设了 65536，这是因为做了 hash 压缩），其中只有少数位置有非零值。</p>
+<p>两种向量的性质对比：</p>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>稠密向量</th>
+<th>稀疏向量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>维度</td>
+<td>1024</td>
+<td>65536</td>
+</tr>
+<tr>
+<td>非零元素</td>
+<td>全部 1024 个</td>
+<td>通常 20~200 个</td>
+</tr>
+<tr>
+<td>空间占用</td>
+<td>4KB</td>
+<td>~1KB（稀疏存储）</td>
+</tr>
+<tr>
+<td>编码内容</td>
+<td>整体语义</td>
+<td>关键词权重分布</td>
+</tr>
+<tr>
+<td>相似度含义</td>
+<td>语义接近程度</td>
+<td>词汇重叠程度</td>
+</tr>
+<tr>
+<td>检索方式</td>
+<td>FAISS HNSW 近似搜索</td>
+<td>暴力内积精确搜索</td>
+</tr>
+</tbody></table>
+<h3 id="sparse-linear-权重的加载"><a href="#sparse-linear-权重的加载" class="headerlink" title="sparse_linear 权重的加载"></a>sparse_linear 权重的加载</h3><p>sparse_linear 是 bge-m3 专有的结构，标准的 XLMRoberta 没有这个头。它的权重存储在模型的 <code>sparse_linear.pt</code> 文件中，需要手动从 HuggingFace 缓存中找到并加载：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">hidden_size = <span class="variable language_">self</span>._base_model.config.hidden_size  <span class="comment"># 1024</span></span><br><span class="line"><span class="variable language_">self</span>._sparse_linear = nn.Linear(hidden_size, <span class="number">1</span>)</span><br><span class="line"></span><br><span class="line">sl_path = os.path.join(snapshot_path, <span class="string">&#x27;sparse_linear.pt&#x27;</span>)</span><br><span class="line">sd = torch.load(sl_path, map_location=<span class="string">&#x27;cpu&#x27;</span>, weights_only=<span class="literal">True</span>)</span><br><span class="line"><span class="variable language_">self</span>._sparse_linear.weight.data = sd[<span class="string">&#x27;weight&#x27;</span>].<span class="built_in">float</span>()</span><br><span class="line"><span class="keyword">if</span> <span class="string">&#x27;bias&#x27;</span> <span class="keyword">in</span> sd:</span><br><span class="line">    <span class="variable language_">self</span>._sparse_linear.bias.data = sd[<span class="string">&#x27;bias&#x27;</span>].<span class="built_in">float</span>()</span><br></pre></td></tr></table></figure>
+
+<p><code>weights_only=True</code> 是 PyTorch 的安全建议——防止 pickle 执行的漏洞。</p>
+<h2 id="FAISS-索引构建"><a href="#FAISS-索引构建" class="headerlink" title="FAISS 索引构建"></a>FAISS 索引构建</h2><h3 id="HNSW-图索引"><a href="#HNSW-图索引" class="headerlink" title="HNSW 图索引"></a>HNSW 图索引</h3><p>IndexHNSWFlat 的参数配置：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">dense_index = faiss.IndexHNSWFlat(d, <span class="number">32</span>)      <span class="comment"># d=1024, M=32</span></span><br><span class="line">dense_index.hnsw.efConstruction = <span class="number">200</span>          <span class="comment"># 建图搜索宽度</span></span><br><span class="line">dense_index.hnsw.efSearch = <span class="number">512</span>               <span class="comment"># 搜索宽度</span></span><br></pre></td></tr></table></figure>
+
+<p>M&#x3D;32 意味着每个节点最多连接 32 个邻居。M 越大图连接越密、召回越高，但内存占用和建图时间也增加。</p>
+<p>efConstruction&#x3D;200 在建图时控制候选邻居的搜索池大小。值越大建的图质量越高（更接近真实的 KNN 图），但建图时间线性增长。对于几千到几万条数据，200 是一个合理的值。</p>
+<p>efSearch&#x3D;512 在搜索时控制候选集大小。值越大搜索越精确，但单次查询时间增加。</p>
+<h3 id="L2-归一化"><a href="#L2-归一化" class="headerlink" title="L2 归一化"></a>L2 归一化</h3><p>FAISS 的 IndexHNSWFlat 用 L2 距离做度量。如果向量做过 L2 归一化（每个向量的模长为 1），L2 距离和余弦相似度是等价的。所以代码里每次添加向量和查询向量之前都做归一化：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">faiss.normalize_L2(emb.dense)       <span class="comment"># 添加索引前</span></span><br><span class="line">dense_index.add(emb.dense)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 搜索时</span></span><br><span class="line">faiss.normalize_L2(query_dense)     <span class="comment"># 查询前</span></span><br><span class="line">distances, indices = dense_index.search(query_dense, k)</span><br></pre></td></tr></table></figure>
+
+<h3 id="稀疏矩阵的存储"><a href="#稀疏矩阵的存储" class="headerlink" title="稀疏矩阵的存储"></a>稀疏矩阵的存储</h3><p>稀疏向量用 scipy.sparse.csr_matrix 存储。CSR（Compressed Sparse Row）是稀疏矩阵的标准存储格式，只存非零元素的值、列索引和行偏移，适合维度极高但极稀疏的场景（65536 维中只有几十个非零值）。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> scipy.sparse <span class="keyword">import</span> save_npz, load_npz</span><br><span class="line">save_npz(sparse_path, sparse_matrix)</span><br><span class="line"><span class="comment"># 加载时</span></span><br><span class="line">sparse_matrix = load_npz(sparse_path)</span><br></pre></td></tr></table></figure>
+
+<p>搜索时用矩阵乘法算查询稀疏向量和所有文档稀疏向量的内积：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">scores = query_sparse @ <span class="variable language_">self</span>._sparse_matrix.T</span><br><span class="line"><span class="comment"># query_sparse:    (1, 65536)  的 CSR 矩阵</span></span><br><span class="line"><span class="comment"># self._sparse_matrix: (n_chunks, 65536) 的 CSR 矩阵</span></span><br><span class="line"><span class="comment"># 结果: (1, n_chunks) — 每个文档的稀疏相似度分数</span></span><br></pre></td></tr></table></figure>
+
+<p>CSR 矩阵乘法在底层自动跳过零元素，效率很高。</p>
+<h2 id="多租户和索引持久化"><a href="#多租户和索引持久化" class="headerlink" title="多租户和索引持久化"></a>多租户和索引持久化</h2><p>每个租户的数据独立存储。以”租户名”作为目录名：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">data/rag_indexes/</span><br><span class="line">├── demo/</span><br><span class="line">│   ├── dense.faiss      # FAISS 索引</span><br><span class="line">│   ├── sparse.npz       # 稀疏矩阵</span><br><span class="line">│   ├── chunks.jsonl     # 文本块数据</span><br><span class="line">│   └── .lock            # 文件锁</span><br><span class="line">└── qa-main/</span><br><span class="line">    └── ...</span><br></pre></td></tr></table></figure>
+
+<p>chunks.jsonl 每行是一个 JSON 对象，包含文本内容和自定义 metadata，搜索时返回给调用方：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span><span class="attr">&quot;text&quot;</span><span class="punctuation">:</span> <span class="string">&quot;...&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;metadata&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span><span class="attr">&quot;key&quot;</span><span class="punctuation">:</span> <span class="string">&quot;B&quot;</span><span class="punctuation">,</span> <span class="attr">&quot;knowledge_point&quot;</span><span class="punctuation">:</span> <span class="string">&quot;确定首句&quot;</span><span class="punctuation">&#125;</span><span class="punctuation">,</span> <span class="attr">&quot;chunk_index&quot;</span><span class="punctuation">:</span> <span class="number">0</span><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>使用 filelock 做进程间互斥，防止多个进程同时写一个租户的索引：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> filelock <span class="keyword">import</span> FileLock</span><br><span class="line">lock = FileLock(os.path.join(tenant_dir, <span class="string">&#x27;.lock&#x27;</span>), timeout=<span class="number">5</span>)</span><br><span class="line"><span class="keyword">with</span> lock:</span><br><span class="line">    <span class="comment"># 构建/更新索引</span></span><br></pre></td></tr></table></figure>
+
+<p>索引构建后持久化到磁盘，下次服务启动不需要重新编码，直接从磁盘加载：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">load</span>(<span class="params">self</span>):</span><br><span class="line">    <span class="variable language_">self</span>._dense_index = faiss.read_index(<span class="variable language_">self</span>._dense_path)</span><br><span class="line">    <span class="variable language_">self</span>._sparse_matrix = load_npz(<span class="variable language_">self</span>._sparse_path)</span><br><span class="line">    <span class="variable language_">self</span>._chunks = <span class="variable language_">self</span>._read_chunks()</span><br></pre></td></tr></table></figure>
+
+<p>实际上线时，预热时间是秒级的——读三个文件、加载到内存而已。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+              <a href="/tags/%E5%B5%8C%E5%85%A5/" rel="tag"># 嵌入</a>
+              <a href="/tags/FAISS/" rel="tag"># FAISS</a>
+              <a href="/tags/%E7%B4%A2%E5%BC%95/" rel="tag"># 索引</a>
+              <a href="/tags/bge-m3/" rel="tag"># bge-m3</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%80-%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B/" rel="prev" title="RAG 服务搭建记录（一）：从零开始">
+                  <i class="fa fa-angle-left"></i> RAG 服务搭建记录（一）：从零开始
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%89-%E6%A3%80%E7%B4%A2%E4%B8%8E%E7%B2%BE%E6%8E%92/" rel="next" title="RAG 服务搭建记录（三）：检索与精排">
+                  RAG 服务搭建记录（三）：检索与精排 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

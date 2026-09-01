@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="系列第 1 篇：从脚本式 V1 到 Agent V2 的重构——单循环替代五阶段设计、@tool 注册框架、并行执行器、LLM 网关与搜索降级">
+<meta property="og:type" content="article">
+<meta property="og:title" content="QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架">
+<meta property="og:url" content="https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="系列第 1 篇：从脚本式 V1 到 Agent V2 的重构——单循环替代五阶段设计、@tool 注册框架、并行执行器、LLM 网关与搜索降级">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-29T13:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="NoneBot2">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="项目">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/","path":"2026/08/29/QQ群AI助手开发记录-一-Agent架构与工具框架/","title":"QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架 | Camille">
+      <meta itemprop="description" content="系列第 1 篇：从脚本式 V1 到 Agent V2 的重构——单循环替代五阶段设计、@tool 注册框架、并行执行器、LLM 网关与搜索降级">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-29 13:00:00" itemprop="dateCreated datePublished" datetime="2026-08-29T13:00:00+00:00">2026-08-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">系列第 1 篇：从脚本式 V1 到 Agent V2 的重构——单循环替代五阶段设计、@tool 注册框架、并行执行器、LLM 网关与搜索降级</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>年初给自己加的 QQ 群写了一个 AI 助手，断断续续做到现在。中间经历了一次比较大的重构——从”关键词触发 + 手写工具字典”的脚本式 V1，重构成现在的 Agent 架构 V2。这个系列三篇文章记录现在的架构长什么样、为什么这么设计，以及重构路上踩的坑。这一篇讲骨架：Agent 循环和工具框架。</p>
+<p>项目地址：<a target="_blank" rel="noopener" href="https://github.com/Aphthog/QQ-bot">github.com&#x2F;Aphthog&#x2F;QQ-bot</a>。</p>
+<h2 id="整体架构"><a href="#整体架构" class="headerlink" title="整体架构"></a>整体架构</h2><p>技术栈：NoneBot2 + OneBot V11 协议接入，GLM 做大脑（原生 tool calling），SQLite 存会话，ChromaDB 存语义记忆。整个 <code>qq_bot</code> 包按职责分层：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">bot.py              # 装配层：构建记忆栈、System Prompt、AgentLoop，注入插件</span><br><span class="line">qq_bot/</span><br><span class="line">├── plugins/        # NoneBot2 事件接入：触发规则、上下文组装、回复发送</span><br><span class="line">├── access/         # 准入控制：superuser、封禁、滑动窗口限流</span><br><span class="line">├── security/       # 输入侧注入拦截、URL/SSRF 校验</span><br><span class="line">├── agent/          # AgentLoop：统一的工具调用循环</span><br><span class="line">├── tools/          # @tool 装饰器注册框架 + 并行执行器</span><br><span class="line">├── llm/            # LLM 网关：Provider Protocol + GLM 实现</span><br><span class="line">├── memory/         # 三层记忆：SQLite 会话 + ChromaDB 语义 + 用户画像</span><br><span class="line">└── services/       # 网页爬虫等业务服务</span><br></pre></td></tr></table></figure>
+
+<p>一条消息的完整链路（群聊）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">QQ 消息 → preprocessor（注入拦截/长度限制，见系列第二篇）</span><br><span class="line">       → chat.py（@bot 触发判断 → 限流 → 拉上下文 → 语义召回）</span><br><span class="line">       → AgentLoop.run（LLM ↔ 工具循环，最多 5 轮）</span><br><span class="line">       → memory.save + 画像更新 + 事实抽取（见系列第三篇）</span><br><span class="line">       → 回复发送</span><br></pre></td></tr></table></figure>
+
+<p>装配在 <code>bot.py</code> 里手工完成：构建 MemoryStore&#x2F;VectorStore&#x2F;ProfileManager&#x2F;MemoryManager&#x2F;AccessGuard，拼 System Prompt，new 一个 AgentLoop，然后在 <code>load_plugins()</code> <strong>之后</strong>把单例塞进 chat 插件的模块变量——顺序是个坑：<code>load_plugins</code> 会 import 插件模块，注入必须发生在那之后，不然插件拿到的是 None。</p>
+<h2 id="从五阶段设计简化成一个循环"><a href="#从五阶段设计简化成一个循环" class="headerlink" title="从五阶段设计简化成一个循环"></a>从五阶段设计简化成一个循环</h2><p>V2 动工前我画过一张”标准 Agent 架构图”：Router 做意图分类，Planner 把任务分解成带依赖的步骤 JSON，Executor 按依赖并行执行，Reflector 拿着结果裁决 done&#x2F;retry&#x2F;replan，最后 Builder 合成回复。这套五件套我真实现了，每个组件都有单测。</p>
+<p>然后上线前看了一眼，把它们全从生产路径上拿掉了。现在的核心循环长这样：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/agent/core.py — AgentLoop._run_unified_loop（节选）</span></span><br><span class="line">max_rounds = config.AGENT_MAX_PLAN_STEPS   <span class="comment"># 5</span></span><br><span class="line"><span class="keyword">for</span> _ <span class="keyword">in</span> <span class="built_in">range</span>(max_rounds):</span><br><span class="line">    result = <span class="keyword">await</span> <span class="variable language_">self</span>.llm.chat_with_tools(</span><br><span class="line">        messages, tools=tools, max_tokens=config.MAX_RESPONSE_TOKENS,</span><br><span class="line">        enable_thinking=config.TASK_THINKING,</span><br><span class="line">    )</span><br><span class="line"></span><br><span class="line">    content = result.get(<span class="string">&quot;content&quot;</span>)</span><br><span class="line">    tool_calls = result.get(<span class="string">&quot;tool_calls&quot;</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># LLM returned text content — check it&#x27;s not a leaked tool call</span></span><br><span class="line">    <span class="keyword">if</span> content <span class="keyword">and</span> tool_calls <span class="keyword">is</span> <span class="literal">None</span>:</span><br><span class="line">        stripped = content.strip()</span><br><span class="line">        <span class="keyword">if</span> stripped.startswith(<span class="string">&quot;&lt;tool_call&gt;&quot;</span>) <span class="keyword">or</span> stripped.startswith(<span class="string">&quot;&#123;&quot;</span>):</span><br><span class="line">            <span class="comment"># Model emitted tool call as text — treat as tool call, don&#x27;t show to user</span></span><br><span class="line">            tool_calls = _parse_text_tool_call(stripped)</span><br><span class="line">            content = <span class="literal">None</span></span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            <span class="keyword">if</span> _is_search_failure(stripped):</span><br><span class="line">                fallback = <span class="keyword">await</span> _fallback_web_search(text)</span><br><span class="line">                <span class="comment"># ...成功则把搜索结果塞回 messages，continue 续跑</span></span><br><span class="line">                <span class="keyword">return</span> content <span class="keyword">if</span> <span class="keyword">not</span> fallback <span class="keyword">else</span> ...</span><br><span class="line">            <span class="keyword">return</span> content</span><br><span class="line"></span><br><span class="line">    <span class="comment"># Execute locally-registered tools (web_fetch, run_code)</span></span><br><span class="line">    local_calls = [tc <span class="keyword">for</span> tc <span class="keyword">in</span> tool_calls <span class="keyword">if</span> tc[<span class="string">&quot;name&quot;</span>] <span class="keyword">in</span> ToolRegistry._tools]</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> local_calls:</span><br><span class="line">        <span class="keyword">continue</span>  <span class="comment"># LLM used built-in web_search, loop for final answer</span></span><br><span class="line"></span><br><span class="line">    results = <span class="keyword">await</span> ToolRegistry.execute_all(local_calls, ctx)</span><br><span class="line">    <span class="comment"># ...把 assistant 的 tool_calls 和执行结果 append 回 messages，继续下一轮</span></span><br></pre></td></tr></table></figure>
+
+<p>为什么砍掉五阶段？<strong>群聊场景 90% 的请求是闲聊和单步查询</strong>。为一句”今天天气怎样”走 Router → Planner → Executor → Reflector → Builder 全流程，意味着 3~5 次额外的 LLM 调用——延迟翻几倍，token 费用翻几倍，每个环节还各挂一个需要兜底的失败点。原生 tool calling 本身就是 ReAct：模型自己决定调不调工具、调几个、要不要续跑，<strong>单循环 + 工具回填</strong>就够了。五阶段只在真正的多步复杂任务上有收益，而那种请求在群里极少出现。</p>
+<p>这算是我在这个项目里学到的最贵的一课：<strong>架构服务于场景，不是服务于架构图</strong>。Planner 那套代码还留在 <code>agent/</code> 里（有测试），哪天做需要确定性多步执行的场景可以捡回来。</p>
+<p>循环里还有几个小防线：<code>COMMANDS</code> 前缀命令（&#x2F;ping、&#x2F;status 等）走快速路径不进 LLM；<code>_is_garbage</code> 把空消息和纯标点过滤掉，省 API 调用；5 轮打满返回固定兜底话术”想了半天还是没结果，换个问法试试？”。</p>
+<h3 id="泄漏的工具调用：-parse-text-tool-call"><a href="#泄漏的工具调用：-parse-text-tool-call" class="headerlink" title="泄漏的工具调用：_parse_text_tool_call"></a>泄漏的工具调用：_parse_text_tool_call</h3><p>有些模型偶尔会把工具调用当正文吐出来，输出一段 <code>&lt;tool_call&gt;{...}&lt;/tool_call&gt;</code> 文本。不兜住的话用户会直接看到一堆 JSON。解析函数很短：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/agent/core.py</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">_parse_text_tool_call</span>(<span class="params">text: <span class="built_in">str</span></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="type">Any</span>]] | <span class="literal">None</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Parse tool calls that the model emitted as text instead of native tool_calls.&quot;&quot;&quot;</span></span><br><span class="line">    <span class="comment"># Try &lt;tool_call&gt;...&lt;/tool_call&gt; wrapper first</span></span><br><span class="line">    <span class="keyword">match</span> = re.search(<span class="string">r&quot;&lt;tool_call&gt;\s*(.*?)\s*&lt;/tool_call&gt;&quot;</span>, text, re.DOTALL)</span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">match</span>:</span><br><span class="line">        text = <span class="keyword">match</span>.group(<span class="number">1</span>)</span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        data = json.loads(text)</span><br><span class="line">    <span class="keyword">except</span> json.JSONDecodeError:</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">None</span></span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">isinstance</span>(data, <span class="built_in">dict</span>) <span class="keyword">and</span> <span class="string">&quot;name&quot;</span> <span class="keyword">in</span> data:</span><br><span class="line">        <span class="keyword">return</span> [&#123;<span class="string">&quot;id&quot;</span>: <span class="string">&quot;call_text_0&quot;</span>, <span class="string">&quot;name&quot;</span>: data[<span class="string">&quot;name&quot;</span>], <span class="string">&quot;arguments&quot;</span>: data.get(<span class="string">&quot;arguments&quot;</span>, &#123;&#125;)&#125;]</span><br><span class="line">    ...</span><br></pre></td></tr></table></figure>
+
+<p>主循环检测到正文以 <code>&lt;tool_call&gt;</code> 或 <code>{</code> 开头就尝试解析回来，转成正常的 tool_calls 走执行流程。这一小段代码消灭了一整类”看不懂的回复”。</p>
+<h2 id="tool-装饰器：告别手写双字典"><a href="#tool-装饰器：告别手写双字典" class="headerlink" title="@tool 装饰器：告别手写双字典"></a>@tool 装饰器：告别手写双字典</h2><p>V1 注册一个工具要维护两个字典：<code>TOOL_SCHEMAS</code> 手写 JSON schema，<code>TOOL_HANDLERS</code> 放函数——改一个参数要同步改两处，漏一处就是线上事故。V2 换成装饰器注册：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/tools/core.py</span></span><br><span class="line"><span class="meta">@tool(<span class="params"></span></span></span><br><span class="line"><span class="params"><span class="meta">    name=<span class="string">&quot;web_fetch&quot;</span>,</span></span></span><br><span class="line"><span class="params"><span class="meta">    description=<span class="string">&quot;抓取网页正文内容。适用：打开搜索结果链接、读取文章全文。&quot;</span>,</span></span></span><br><span class="line"><span class="params"><span class="meta">    params=&#123;<span class="string">&quot;url&quot;</span>: (<span class="params"><span class="built_in">str</span>, <span class="string">&quot;网页URL，必须以 https:// 开头&quot;</span></span>)&#125;,</span></span></span><br><span class="line"><span class="params"><span class="meta">    category=<span class="string">&quot;core&quot;</span>,</span></span></span><br><span class="line"><span class="params"><span class="meta"></span>)</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">web_fetch</span>(<span class="params">url: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    ...</span><br></pre></td></tr></table></figure>
+
+<p>schema 由 <code>ToolInfo.to_openai_schema()</code> 统一生成。这里说明一个精确的实现细节（面试被问过）：schema 的<strong>参数类型来自 <code>params</code> 字典里显式声明的类型</strong>，<strong>required 列表则用 <code>inspect.signature</code> 推断</strong>——签名里没有默认值的参数即 required：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/tools/registry.py（节选）</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">to_openai_schema</span>(<span class="params">self</span>) -&gt; <span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="type">Any</span>]:</span><br><span class="line">    sig = inspect.signature(<span class="variable language_">self</span>.handler)</span><br><span class="line">    properties: <span class="built_in">dict</span>[<span class="built_in">str</span>, <span class="type">Any</span>] = &#123;&#125;</span><br><span class="line">    required: <span class="built_in">list</span>[<span class="built_in">str</span>] = []</span><br><span class="line">    <span class="keyword">for</span> pname, (ptype, pdesc) <span class="keyword">in</span> <span class="variable language_">self</span>.params.items():</span><br><span class="line">        json_type = <span class="string">&quot;string&quot;</span> <span class="keyword">if</span> ptype <span class="keyword">is</span> <span class="built_in">str</span> <span class="keyword">else</span> <span class="string">&quot;number&quot;</span> <span class="keyword">if</span> ptype <span class="keyword">in</span> (<span class="built_in">int</span>, <span class="built_in">float</span>) <span class="keyword">else</span> <span class="string">&quot;string&quot;</span></span><br><span class="line">        properties[pname] = &#123;<span class="string">&quot;type&quot;</span>: json_type, <span class="string">&quot;description&quot;</span>: pdesc&#125;</span><br><span class="line">        param = sig.parameters.get(pname)</span><br><span class="line">        <span class="keyword">if</span> param <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span> <span class="keyword">and</span> param.default <span class="keyword">is</span> inspect.Parameter.empty:</span><br><span class="line">            required.append(pname)</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;type&quot;</span>: <span class="string">&quot;function&quot;</span>, <span class="string">&quot;function&quot;</span>: &#123;...&#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>之所以不从 Python 类型注解全自动生成，是因为注解承载不了”参数描述”和可选性这些 schema 必需的信息——<code>params</code> 字典是”声明一次、描述齐全”的折中。工具写完函数、套个装饰器，注册和 schema 一次搞定。</p>
+<p>注册时查重（重名直接 <code>raise ValueError</code>），<code>category=&quot;admin&quot;</code> 的工具不会出现在发给模型的 schema 里（<code>get_all_schemas(for_user=True)</code> 过滤）——<strong>管理员工具对模型不可见，是比”告诉模型别用”强得多的限制</strong>。</p>
+<h2 id="执行器：错误变成工具结果，而不是让循环崩掉"><a href="#执行器：错误变成工具结果，而不是让循环崩掉" class="headerlink" title="执行器：错误变成工具结果，而不是让循环崩掉"></a>执行器：错误变成工具结果，而不是让循环崩掉</h2><p>工具执行层是统一的并行执行器：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/tools/registry.py（节选）</span></span><br><span class="line"><span class="meta">@classmethod</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">execute</span>(<span class="params">cls, name, arguments, ctx</span>) -&gt; <span class="built_in">str</span>:</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        result = <span class="keyword">await</span> asyncio.wait_for(</span><br><span class="line">            info.handler(**&#123;k: v <span class="keyword">for</span> k, v <span class="keyword">in</span> merged.items() <span class="keyword">if</span> k <span class="keyword">in</span> info.params&#125;),</span><br><span class="line">            timeout=info.timeout <span class="keyword">or</span> config.AGENT_TOOL_TIMEOUT,</span><br><span class="line">        )</span><br><span class="line">        <span class="keyword">return</span> <span class="built_in">str</span>(result) <span class="keyword">if</span> result <span class="keyword">is</span> <span class="keyword">not</span> <span class="literal">None</span> <span class="keyword">else</span> <span class="string">&quot;&quot;</span></span><br><span class="line">    <span class="keyword">except</span> asyncio.TimeoutError:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">f&quot;[工具 &#x27;<span class="subst">&#123;name&#125;</span>&#x27; 执行超时]&quot;</span></span><br><span class="line">    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">f&quot;[工具 &#x27;<span class="subst">&#123;name&#125;</span>&#x27; 执行异常: <span class="subst">&#123;<span class="built_in">type</span>(e).__name__&#125;</span>]&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># execute_all: asyncio.gather 并行跑所有 tool_calls</span></span><br></pre></td></tr></table></figure>
+
+<p>两个设计决定：每个工具包一层 <code>asyncio.wait_for</code> 超时（默认 15 秒）；超时和异常<strong>都不抛出</strong>，而是转成 <code>[工具 &#39;x&#39; 执行超时]</code> 这种字符串喂回给模型，让它自己决定换工具还是放弃。<strong>把错误变成工具结果继续推理，而不是让整个循环崩掉</strong>，这是 Agent 稳定性的一个关键技巧——模型拿到”超时”的信息后，往往会主动换一个参数重试或改用别的工具。</p>
+<h2 id="LLM-网关与搜索降级"><a href="#LLM-网关与搜索降级" class="headerlink" title="LLM 网关与搜索降级"></a>LLM 网关与搜索降级</h2><p>LLM 调用收敛在一个网关类里，GLM 实现统一拼 payload：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/llm/glm_4v.py（节选）</span></span><br><span class="line"><span class="keyword">if</span> enable_search:</span><br><span class="line">    all_tools.append(&#123;<span class="string">&quot;type&quot;</span>: <span class="string">&quot;web_search&quot;</span>, <span class="string">&quot;web_search&quot;</span>: &#123;<span class="string">&quot;enable&quot;</span>: <span class="literal">True</span>&#125;&#125;)</span><br><span class="line"><span class="keyword">if</span> all_tools:</span><br><span class="line">    payload[<span class="string">&quot;tools&quot;</span>] = all_tools</span><br><span class="line">    payload[<span class="string">&quot;tool_choice&quot;</span>] = tool_choice</span><br></pre></td></tr></table></figure>
+
+<p>GLM 内置的 <code>web_search</code> 一行配置就能开，模型自己决定什么时候搜。<code>thinking</code> 参数做成开关（<code>{&quot;type&quot;: &quot;enabled&quot;}</code> &#x2F; <code>{&quot;type&quot;: &quot;disabled&quot;}</code>），闲聊关思考省 token、工具任务开思考提升准确率。</p>
+<p>但上线后发现内置搜索时不时超时，然后模型会在正文里说”搜索超时，我无法回答”。观察一阵规律后加了个有点丑但管用的降级：检测回复里的失败话术，自动换 DuckDuckGo 的 HTML 版重搜一次：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/agent/core.py</span></span><br><span class="line">SEARCH_FAILURE_MARKERS = [</span><br><span class="line">    <span class="string">&quot;搜索工具超时&quot;</span>, <span class="string">&quot;搜索超时&quot;</span>, <span class="string">&quot;搜索失败&quot;</span>, <span class="string">&quot;无法搜索&quot;</span>,</span><br><span class="line">    <span class="string">&quot;search timeout&quot;</span>, <span class="string">&quot;search failed&quot;</span>,</span><br><span class="line">]</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">_fallback_web_search</span>(<span class="params">query: <span class="built_in">str</span></span>) -&gt; <span class="built_in">str</span> | <span class="literal">None</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Direct DuckDuckGo HTML search when Zhipu&#x27;s built-in search fails.&quot;&quot;&quot;</span></span><br><span class="line">    ...</span><br><span class="line">    resp = <span class="keyword">await</span> client.get(<span class="string">&quot;https://html.duckduckgo.com/html/&quot;</span>, params=&#123;<span class="string">&quot;q&quot;</span>: query&#125;, ...)</span><br><span class="line">    soup = BeautifulSoup(resp.text, <span class="string">&quot;html.parser&quot;</span>)</span><br><span class="line">    results = [el.get_text(strip=<span class="literal">True</span>) <span class="keyword">for</span> el <span class="keyword">in</span> soup.select(<span class="string">&quot;.result__snippet&quot;</span>)]</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;\n&quot;</span>.join(results[:<span class="number">5</span>]) <span class="keyword">if</span> results <span class="keyword">else</span> <span class="literal">None</span></span><br></pre></td></tr></table></figure>
+
+<p>靠话术匹配做故障检测确实不优雅，正经做法是服务商在响应里给结构化错误码——但等不到那一天，群友已经先被”我无法搜索”气走了。降级结果以 <code>[网络搜索结果]</code> 前缀塞回对话继续跑，用户无感。连降级都挂了才回兜底话术。</p>
+<h2 id="面试追问预演"><a href="#面试追问预演" class="headerlink" title="面试追问预演"></a>面试追问预演</h2><p><strong>Q: 你的 Agent 循环和 ReAct 是什么关系？</strong><br>A: ReAct 的本质是”推理-行动-观察”交替，原生 tool calling 让模型在一轮里自己决定行动（tool_calls），我负责执行并回填结果（观察），循环直到模型给出纯文本回答。我的 <code>_run_unified_loop</code> 就是一个 ReAct 循环的工程化实现，只是”推理”由模型内置完成。</p>
+<p><strong>Q: 为什么限制 5 轮？</strong><br>A: 防失控——模型陷入”调工具-失败-再调”循环时烧钱且用户无感等待。5 轮足够覆盖”搜索→打开网页→计算”这类复合任务，打满给兜底话术。</p>
+<p><strong>Q: 工具执行失败怎么处理？</strong><br>A: 不抛异常中断循环，而是把错误字符串作为工具结果回填，让模型自己决定重试、换工具或放弃。这是把错误处理从”控制流”挪到”信息流”。</p>
+<p><strong>Q: 工具 schema 是怎么生成的？</strong><br>A: @tool 装饰器注册，参数类型从 params 字典显式声明，required 用 inspect.signature 推断（无默认值即必填）。没做成”纯类型注解自动生成”是因为注解承载不了参数描述信息。</p>
+<hr>
+<p>系列目录：</p>
+<ul>
+<li><a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/">（一）Agent 架构与工具框架</a>（本篇）</li>
+<li><a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E4%B8%89%E5%B1%82%E5%AE%89%E5%85%A8%E9%98%B2%E5%BE%A1/">（二）三层安全防御</a></li>
+<li><a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%89-%E4%B8%89%E5%B1%82%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F/">（三）三层记忆系统</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Python/" rel="tag"># Python</a>
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/NoneBot2/" rel="tag"># NoneBot2</a>
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/" rel="prev" title="高并发拼团交易系统拆解（四）：结算回调与退款逆向">
+                  <i class="fa fa-angle-left"></i> 高并发拼团交易系统拆解（四）：结算回调与退款逆向
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E4%B8%89%E5%B1%82%E5%AE%89%E5%85%A8%E9%98%B2%E5%BE%A1/" rel="next" title="QQ 群 AI 助手开发记录（二）：三层安全防御">
+                  QQ 群 AI 助手开发记录（二）：三层安全防御 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

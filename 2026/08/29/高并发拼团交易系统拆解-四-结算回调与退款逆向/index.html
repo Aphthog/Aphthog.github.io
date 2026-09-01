@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="系列第 4 篇：结算的三连条件更新、事务性发件箱保证回调必达、定时补偿与 Redisson 抢占、退款状态机的枚举路由、「团失败」到底由谁判定的状态机不闭环，以及整个系列的设计观总结">
+<meta property="og:type" content="article">
+<meta property="og:title" content="高并发拼团交易系统拆解（四）：结算回调与退款逆向">
+<meta property="og:url" content="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="系列第 4 篇：结算的三连条件更新、事务性发件箱保证回调必达、定时补偿与 Redisson 抢占、退款状态机的枚举路由、「团失败」到底由谁判定的状态机不闭环，以及整个系列的设计观总结">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-29T12:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="DDD">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="项目">
+<meta property="article:tag" content="高并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/","path":"2026/08/29/高并发拼团交易系统拆解-四-结算回调与退款逆向/","title":"高并发拼团交易系统拆解（四）：结算回调与退款逆向"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>高并发拼团交易系统拆解（四）：结算回调与退款逆向 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="高并发拼团交易系统拆解（四）：结算回调与退款逆向 | Camille">
+      <meta itemprop="description" content="系列第 4 篇：结算的三连条件更新、事务性发件箱保证回调必达、定时补偿与 Redisson 抢占、退款状态机的枚举路由、「团失败」到底由谁判定的状态机不闭环，以及整个系列的设计观总结">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          高并发拼团交易系统拆解（四）：结算回调与退款逆向
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-29 12:00:00" itemprop="dateCreated datePublished" datetime="2026-08-29T12:00:00+00:00">2026-08-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">系列第 4 篇：结算的三连条件更新、事务性发件箱保证回调必达、定时补偿与 Redisson 抢占、退款状态机的枚举路由、「团失败」到底由谁判定的状态机不闭环，以及整个系列的设计观总结</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>用户付完钱之后，故事才到一半：商城回调过来要结算成团，成团了要通知商城，用户要退款要逆向走一遍所有状态。正向流程决定了系统能不能用，逆向流程决定了系统敢不敢用。这一篇收尾。</p>
+<blockquote>
+<p>系列目录见<a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">第一篇</a>。</p>
+</blockquote>
+<h2 id="结算：一个事务里的三连条件更新"><a href="#结算：一个事务里的三连条件更新" class="headerlink" title="结算：一个事务里的三连条件更新"></a>结算：一个事务里的三连条件更新</h2><p>商城支付成功后回调结算接口。核心是 <code>settlementMarketPayOrder</code>，在<strong>同一个数据库事务</strong>里完成三步条件更新：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1. 交易单：CREATE -&gt; COMPLETE（where status = 0）</span></span><br><span class="line"><span class="comment">// 2. 组队进度：complete_count + 1（where complete_count &lt; target_count ... 语义同 lock_count 条件更新）</span></span><br><span class="line"><span class="comment">// 3. 满员时：拼团主单 status -&gt; COMPLETE（where status = 0）</span></span><br></pre></td></tr></table></figure>
+
+<p>每一步都带状态条件，影响行数为 0 就抛异常回滚整个事务。源码里这段写着一条值得背下来的注释——<strong>为什么用影响行数做判断而不是先查再改</strong>：先查再改在并发下两步之间存在窗口（查的时候没满，改的时候满了），条件更新把判断和变更压缩成一次原子操作，这也是结算幂等的来源——重复回调时 <code>where status = 0</code> 不命中，影响行数 0，不会重复结算。</p>
+<p>满员的最后一次结算会把拼团主单置为”完成”，同时<strong>在同一事务里插入一条回调任务</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TradeRepository.settlementMarketPayOrder —— 结算事务内</span></span><br><span class="line"><span class="comment">// 拼团完成写入回调任务记录</span></span><br><span class="line"><span class="type">NotifyTask</span> <span class="variable">notifyTask</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">NotifyTask</span>();</span><br><span class="line">notifyTask.setTeamId(groupBuyTeamEntity.getTeamId());</span><br><span class="line">notifyTask.setNotifyCount(<span class="number">0</span>);</span><br><span class="line">notifyTask.setNotifyStatus(<span class="number">0</span>);          <span class="comment">// 0初始、1完成、2重试、3失败</span></span><br><span class="line">notifyTask.setUuid(teamId + <span class="string">&quot;_&quot;</span> + category + <span class="string">&quot;_&quot;</span> + outTradeNo);   <span class="comment">// 幂等键</span></span><br><span class="line">notifyTask.setParameterJson(JSON.toJSONString(...));</span><br><span class="line">notifyTaskDao.insert(notifyTask);       <span class="comment">// 与结算更新同一事务</span></span><br></pre></td></tr></table></figure>
+
+<p>这就是<strong>事务性发件箱（本地消息表）</strong>，它解决的问题是：成团通知怎么保证不丢。</p>
+<h2 id="事务性发件箱：回调必达的笨办法和好办法"><a href="#事务性发件箱：回调必达的笨办法和好办法" class="headerlink" title="事务性发件箱：回调必达的笨办法和好办法"></a>事务性发件箱：回调必达的笨办法和好办法</h2><p>朴素做法是在结算事务里直接发 HTTP。两个死法：</p>
+<ul>
+<li>事务里掺网络 IO 是反模式——HTTP 慢 3 秒，DB 连接被占 3 秒，高峰期连接池直接打穿；</li>
+<li>时序无解——先发消息后提交，事务回滚对方收到”幽灵通知”；先提交后发消息，应用崩溃通知就丢了。</li>
+</ul>
+<p>发件箱的方案是把”要发消息”这件事本身变成业务数据：<strong>消息写入和业务变更同事务，要么一起成功要么一起失败</strong>。剩下的就是怎么把表里的任务投递出去——“即时 + 补偿”双通道：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TradeTaskService.execNotifyJob —— 补偿通道的循环体</span></span><br><span class="line"><span class="type">String</span> <span class="variable">response</span> <span class="operator">=</span> port.groupBuyNotify(notifyTask);</span><br><span class="line"><span class="keyword">if</span> (NotifyTaskHTTPEnumVO.SUCCESS.getCode().equals(response)) &#123;</span><br><span class="line">    repository.updateNotifyTaskStatusSuccess(notifyTask);</span><br><span class="line">&#125; <span class="keyword">else</span> <span class="keyword">if</span> (NotifyTaskHTTPEnumVO.ERROR.getCode().equals(response)) &#123;</span><br><span class="line">    <span class="keyword">if</span> (notifyTask.getNotifyCount() &gt; <span class="number">4</span>) &#123;</span><br><span class="line">        repository.updateNotifyTaskStatusError(notifyTask);    <span class="comment">// 彻底失败</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        repository.updateNotifyTaskStatusRetry(notifyTask);    <span class="comment">// 继续重试</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><strong>即时通道</strong>：结算事务一提交就扔线程池先试一把投递，绝大多数通知在一秒内送达，<code>notify_status</code> 直接置 1；</li>
+<li><strong>补偿通道</strong>：定时任务扫 <code>notify_status in (0, 2)</code> 的记录重新投递，重试有上限——<code>notifyCount &gt; 4</code> 标记彻底失败，防止下游挂掉时死循环打爆对方。</li>
+</ul>
+<p>投递动作本身有并发防护，多实例部署时两把锁：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TradePort.groupBuyNotify —— 抢不到锁的实例直接放弃（等补偿任务）</span></span><br><span class="line"><span class="type">RLock</span> <span class="variable">lock</span> <span class="operator">=</span> redisClient.getLock(...);</span><br><span class="line"><span class="type">boolean</span> <span class="variable">isLock</span> <span class="operator">=</span> lock.tryLock(<span class="number">3</span>, <span class="number">0</span>, TimeUnit.SECONDS);</span><br><span class="line"><span class="keyword">if</span> (!isLock) <span class="keyword">return</span> <span class="literal">null</span>;</span><br></pre></td></tr></table></figure>
+
+<p>以及定时任务入口的 Redisson 抢占（<code>tryLock(3, 60, SECONDS)</code>）——<strong>谁抢到谁执行，防的是 N 台机器把同一份通知发 N 遍</strong>。整套设计与 Transactional Outbox 模式完全同构：没有 Canal、没有 Kafka 事务消息，一张表 + 一个定时任务换来至少一次投递保证。投递的是 at-least-once，所以下游（商城）还需要按 <code>uuid</code> 幂等去重——<code>teamId_category_outTradeNo</code> 这个幂等键就是为对方准备的。</p>
+<h2 id="超时未支付：定时逆向"><a href="#超时未支付：定时逆向" class="headerlink" title="超时未支付：定时逆向"></a>超时未支付：定时逆向</h2><p>锁单后不支付的订单要释放名额。<code>TimeoutRefundJob</code> 每分钟跑一次（顺带说个读代码的小彩蛋：类注释写的是”每 5 分钟”，<code>@Scheduled(cron = &quot;0 */1 * * * ?&quot;)</code> 实际是每 1 分钟——注释和代码打架时，信代码）：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 扫描条件：status = 0（未支付）and out_trade_time is null and now() &gt; end_time limit 10</span></span><br><span class="line"><span class="comment">// 每条订单走退款逆向流程，把占用的名额还回去</span></span><br></pre></td></tr></table></figure>
+
+<p>这里的 <code>end_time</code> 值得单独解释——它不是活动结束时间，而是<strong>每笔订单自己的支付窗口</strong>：锁单落库前用 <code>calendar.add(Calendar.MINUTE, activity.validTime)</code> 算出”锁单时刻 + validTime 分钟”写进明细表。也就是说”到点”的计时从每个人锁单那一刻起算，15 分钟没付款就逐单逆向：明细退单、主表 <code>lock_count - 1</code>（where status &#x3D; 0）、发 MQ 恢复 Redis 库存。</p>
+<p>两个细节：<code>limit 10</code> 是批量的节奏控制，一轮最多处理 10 条，处理不完下一轮继续，避免大结果集拖垮任务；入口的 Redisson <code>tryLock(3, 60, SECONDS)</code> 保证多实例只有一个在跑。</p>
+<p>还有一层要划清：这条超时链路是<strong>订单粒度</strong>的，它清理的是”没付钱的占坑者”，<strong>不会</strong>判定任何团队失败——团队状态机的真相下一节单独讲。</p>
+<h2 id="退款状态机：把路由写进枚举"><a href="#退款状态机：把路由写进枚举" class="headerlink" title="退款状态机：把路由写进枚举"></a>退款状态机：把路由写进枚举</h2><p>退款是逆向流程的难点：拼团单有四种状态（拼单中&#x2F;完成&#x2F;失败&#x2F;完成含退单），交易单有三种（锁定&#x2F;完成&#x2F;退单），两两组合九种，合法退款路径只有三种。把组合判断写成 if&#x2F;else 会随状态增加而爆炸，这里的做法是<strong>状态机直接写进枚举</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// RefundTypeEnumVO</span></span><br><span class="line">UNPAID_UNLOCK(<span class="string">&quot;unpaid_unlock&quot;</span>, <span class="string">&quot;unpaid2RefundStrategy&quot;</span>, <span class="string">&quot;未支付，未成团&quot;</span>) &#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">matches</span><span class="params">(GroupBuyOrderEnumVO groupBuyOrderEnumVO,</span></span><br><span class="line"><span class="params">                           TradeOrderStatusEnumVO tradeOrderStatusEnumVO)</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> GroupBuyOrderEnumVO.PROGRESS.equals(groupBuyOrderEnumVO)</span><br><span class="line">                &amp;&amp; TradeOrderStatusEnumVO.CREATE.equals(tradeOrderStatusEnumVO);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;,</span><br><span class="line">PAID_UNFORMED(<span class="string">&quot;paid_unformed&quot;</span>, <span class="string">&quot;paid2RefundStrategy&quot;</span>, <span class="string">&quot;已支付，未成团&quot;</span>) &#123; ... &#125;,</span><br><span class="line">PAID_FORMED(<span class="string">&quot;paid_formed&quot;</span>, <span class="string">&quot;paidTeam2RefundStrategy&quot;</span>, <span class="string">&quot;已支付，已成团&quot;</span>) &#123; ... &#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> RefundTypeEnumVO <span class="title function_">getRefundStrategy</span><span class="params">(GroupBuyOrderEnumVO group, TradeOrderStatusEnumVO trade)</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> Arrays.stream(values())</span><br><span class="line">            .filter(refundType -&gt; refundType.matches(group, trade))</span><br><span class="line">            .findFirst()</span><br><span class="line">            .orElseThrow(() -&gt; <span class="keyword">new</span> <span class="title class_">RuntimeException</span>(<span class="string">&quot;不支持的退款状态组合&quot;</span>));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>每个枚举值自带 <code>matches()</code> 匹配自己的状态组合，非法组合在路由处就抛异常，不会漏到执行层。三种退款策略的差异用库存动作表达得最清楚：</p>
+<ul>
+<li><strong>未支付退单（UNPAID_UNLOCK）</strong>：锁单量 -1，队伍名额重新打开，还能继续加人；</li>
+<li><strong>已支付未成团（PAID_UNFORMED）</strong>：锁单量、完成量都 -1，人数缺口重新打开；</li>
+<li><strong>已成团退款（PAID_FORMED）</strong>：最微妙——<strong>锁单量不恢复</strong>。队伍已经结算给了上游商城，动组队计数会影响已达成的交易；只把单状态改成”完成含退单”。如果队伍只剩这一个人，拼团直接转失败。</li>
+</ul>
+<p>所有状态流转依然走条件更新。已成团退款在<strong>队伍主表</strong>上按 <code>complete_count</code> 分流成两条 SQL——除退款者外还有其他完成成员就转”完成含退单”，这是最后一个完成成员就直接转”失败”：</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">&lt;!-- group_buy_order_mapper.xml（计数字段调整略） --&gt;</span></span><br><span class="line"><span class="tag">&lt;<span class="name">update</span> <span class="attr">id</span>=<span class="string">&quot;paidTeam2Refund&quot;</span>&gt;</span></span><br><span class="line">    update group_buy_order set status = 3</span><br><span class="line">    where team_id = #&#123;teamId&#125; and (status = 1 or status = 3) and complete_count &gt; 1</span><br><span class="line"><span class="tag">&lt;/<span class="name">update</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">update</span> <span class="attr">id</span>=<span class="string">&quot;paidTeam2RefundFail&quot;</span>&gt;</span></span><br><span class="line">    update group_buy_order set status = 2</span><br><span class="line">    where team_id = #&#123;teamId&#125; and (status = 1 or status = 3) and complete_count = 1</span><br><span class="line"><span class="tag">&lt;/<span class="name">update</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>订单明细表的退单（<code>group_buy_order_list.status -&gt; 2</code>）是另一条按 <code>user_id + order_id</code> 的条件更新，和队伍状态在同一事务里先后执行。并发退款、重复退单在 DB 层被最后拦截——和正向流程的原则一以贯之。</p>
+<p>退单成功后，Redis 侧的库存恢复通过 MQ 异步完成，消费端三段式：本地消息表保证消息一定发出、<code>SET NX(&quot;refund_lock_&quot; + orderId)</code> 保证不重复消费、MQ 重试保证失败必达——<a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">第三篇</a>里那个时间单位 bug 就藏在这段代码里。</p>
+<h2 id="「团失败」到底由谁判定：状态机的一个不闭环"><a href="#「团失败」到底由谁判定：状态机的一个不闭环" class="headerlink" title="「团失败」到底由谁判定：状态机的一个不闭环"></a>「团失败」到底由谁判定：状态机的一个不闭环</h2><p>面试官问过我这个问题的变体：”拼团到点没凑满人，团失败由谁、在什么时机、怎么判定出来？”准备这题时我把全部 mapper 的 update 语句翻了一遍，结论有点反直觉——<strong>“到点没凑满”这个场景，代码里没有任何一行把团队置为失败</strong>。</p>
+<p>把 <code>status = 2</code> 的写入点全部列出来，只有一个：<code>paidTeam2RefundFail</code>，条件是 <code>(status = 1 or status = 3) and complete_count = 1</code>。也就是上面说的<strong>已成团之后、最后一个完成支付的成员退款</strong>才触发——那是”人退光了团死”，不是”没凑满团死”。而超时链路里队伍主表只被 <code>lock_count - 1</code>，状态从头到尾停在”拼单中”。</p>
+<p>所以”没凑满的团死了”在这个系统里是一个<strong>事实状态，不是状态位</strong>：lock_count 被逐单衰减归零、窗口全部过期，没有任何一行 update 宣判它失败。工程库的样例数据就是证据——好几支 target 3、lock 2、有效期早已过期的团，status 至今还是 0。更进一步的边界：超时扫描不碰已支付的单（<code>out_trade_time is null</code> 把它们排除在外），而锁单链路的三关校验（活动状态、参与次数、库存占用）查的是<strong>活动</strong>的窗口和额度，没有一处校验<strong>团队</strong>的 valid_end_time——于是一支”1 人已支付、还差 2 人、团队窗口已过、活动还在有效期”的团，理论上还能继续进人，永远不会被判负。未凑满的已支付成员想离场，只能自己走 PAID_UNFORMED 退款。</p>
+<p>这是我主动写出来的设计现状：<strong>团队状态机不闭环——0 到 1（成团）有完整链路，0 到 2（超时失败）没有</strong>。危害在下游：上游商城能收到成团回调（notify_task 的发件箱链路），却永远收不到”团失败”回调，用户侧的待支付订单没有终态。合理的演进方向：超时扫描时顺带把”窗口已过且 lock_count 未涨”的拼单中主单批量终结为失败，复用 notify_task 发一条团失败 MQ；锁单链路加一关团队窗口校验；或者干脆把扫表换成延迟队列（Redisson DelayedQueue &#x2F; 死信队列），锁单时按单投递、到点即处理，扫表变推送。</p>
+<h2 id="写在最后：三个设计观"><a href="#写在最后：三个设计观" class="headerlink" title="写在最后：三个设计观"></a>写在最后：三个设计观</h2><p>四篇写完，这个项目给我的最大收获不是”会用 Redis 和 MQ”，而是三个设计观的校准：</p>
+<ol>
+<li><strong>正确性放 DB，性能放 Redis</strong>。INCR 和条件更新各司其职，别让缓存承担账本的职责；</li>
+<li><strong>幂等不是功能，是纪律</strong>。四处幂等四处打法，原则统一：唯一键 + 状态条件更新 + 抢占锁；</li>
+<li><strong>失败路径先于成功路径设计</strong>。恢复量 key、notify_task 重试上限、退款策略的”库存不恢复”、定时补偿——这些”失败了怎么办”的代码量一点不比正常流程少，而这正是交易系统和 CRUD 的分水岭。</li>
+</ol>
+<h2 id="面试追问预演"><a href="#面试追问预演" class="headerlink" title="面试追问预演"></a>面试追问预演</h2><p><strong>Q: 为什么不直接用 MQ 的事务消息&#x2F;Canal 监听 binlog？</strong><br>A: 都能解，但引一个中间件的运维成本和这套”一张表 + 定时任务”不成比例。发件箱的缺点是补偿有延迟（秒级），对成团通知这个场景完全够用。如果通知时效要求高到秒级必达、或者下游订阅方变多，再升级到 MQ 方案——表结构不变，投递通道可换。</p>
+<p><strong>Q: 重试上限为什么是 4 次？失败了人工介入？</strong><br>A: 4 次是防止下游长时间不可用时无限重试的止损值，不是精心调优的结果。置为失败态后这条记录不丢，修复下游后可以人工重置状态重新投递；更完善的做法是失败告警 + 管理端一键重试。</p>
+<p><strong>Q: 已成团退款为什么不恢复锁单量？</strong><br>A: 队伍已结算给上游，组队计数代表”这笔交易发生过”，是和商城对账的依据；恢复它会让商城侧的成团记录和营销侧对不上。退款的金额口径在订单上（status &#x3D; 2），库存口径留在队伍上。</p>
+<p><strong>Q: 定时任务扫描会不会漏单&#x2F;重复？</strong><br>A: 扫描按状态条件（status&#x3D;0、超时时间）圈定，处理完状态就变，天然不重复；单轮 limit 10 防止大事务，堆积分轮消化。多实例靠 Redisson 抢占，同一时刻只有一个实例在扫。</p>
+<p><strong>Q: 到点没凑满的团，最终状态是什么？谁来判它失败？</strong><br>A: 这里我会主动指出设计现状：没人判。超时清理是订单粒度的（每分钟扫未支付单逐单逆向、lock_count 减一），团队主单状态永远停在拼单中——“团失败”是 lock_count 归零加窗口过期形成的事实状态，不是被置位的状态。全部 update 语句里 status&#x3D;2 只有一个写入点：成团后最后一个完成支付成员退款（paidTeam2RefundFail，complete_count&#x3D;1）。团队状态机 0 到 1 有、0 到 2 没有，上游收不到团失败回调，这是我指出现状后给出的演进点：扫描时批量终结过期主单 + 发件箱补一条团失败通知，或改延迟队列按单投递。</p>
+<hr>
+<p>系列目录：</p>
+<ul>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">（一）架构总览与领域分域</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/">（二）折扣试算与规则编排</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">（三）库存一致性与幂等</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/">（四）结算回调与退款逆向</a>（本篇）</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+              <a href="/tags/%E9%AB%98%E5%B9%B6%E5%8F%91/" rel="tag"># 高并发</a>
+              <a href="/tags/DDD/" rel="tag"># DDD</a>
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/" rel="prev" title="高并发拼团交易系统拆解（三）：库存一致性与幂等">
+                  <i class="fa fa-angle-left"></i> 高并发拼团交易系统拆解（三）：库存一致性与幂等
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/" rel="next" title="QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架">
+                  QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

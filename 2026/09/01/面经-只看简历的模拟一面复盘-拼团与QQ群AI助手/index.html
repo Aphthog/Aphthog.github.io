@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="只拿到简历的 AI 面试官 vs 以真实代码作答的候选人：11 道题完整复盘——条件更新两层保证、记账式库存恢复、SSRF 两个真洞当场认领，以及简历上那些经不起对账的数字">
+<meta property="og:type" content="article">
+<meta property="og:title" content="面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手）">
+<meta property="og:url" content="https://aphthog.github.io/2026/09/01/%E9%9D%A2%E7%BB%8F-%E5%8F%AA%E7%9C%8B%E7%AE%80%E5%8E%86%E7%9A%84%E6%A8%A1%E6%8B%9F%E4%B8%80%E9%9D%A2%E5%A4%8D%E7%9B%98-%E6%8B%BC%E5%9B%A2%E4%B8%8EQQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="只拿到简历的 AI 面试官 vs 以真实代码作答的候选人：11 道题完整复盘——条件更新两层保证、记账式库存恢复、SSRF 两个真洞当场认领，以及简历上那些经不起对账的数字">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-09-01T10:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="面试">
+<meta property="article:tag" content="项目">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/09/01/%E9%9D%A2%E7%BB%8F-%E5%8F%AA%E7%9C%8B%E7%AE%80%E5%8E%86%E7%9A%84%E6%A8%A1%E6%8B%9F%E4%B8%80%E9%9D%A2%E5%A4%8D%E7%9B%98-%E6%8B%BC%E5%9B%A2%E4%B8%8EQQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/09/01/%E9%9D%A2%E7%BB%8F-%E5%8F%AA%E7%9C%8B%E7%AE%80%E5%8E%86%E7%9A%84%E6%A8%A1%E6%8B%9F%E4%B8%80%E9%9D%A2%E5%A4%8D%E7%9B%98-%E6%8B%BC%E5%9B%A2%E4%B8%8EQQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B/","path":"2026/09/01/面经-只看简历的模拟一面复盘-拼团与QQ群AI助手/","title":"面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手）"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手） | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/09/01/%E9%9D%A2%E7%BB%8F-%E5%8F%AA%E7%9C%8B%E7%AE%80%E5%8E%86%E7%9A%84%E6%A8%A1%E6%8B%9F%E4%B8%80%E9%9D%A2%E5%A4%8D%E7%9B%98-%E6%8B%BC%E5%9B%A2%E4%B8%8EQQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手） | Camille">
+      <meta itemprop="description" content="只拿到简历的 AI 面试官 vs 以真实代码作答的候选人：11 道题完整复盘——条件更新两层保证、记账式库存恢复、SSRF 两个真洞当场认领，以及简历上那些经不起对账的数字">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手）
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+      
+
+      <time title="创建时间：2026-09-01 10:00:00 / 修改时间：06:01:48" itemprop="dateCreated datePublished" datetime="2026-09-01T10:00:00+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">只拿到简历的 AI 面试官 vs 以真实代码作答的候选人：11 道题完整复盘——条件更新两层保证、记账式库存恢复、SSRF 两个真洞当场认领，以及简历上那些经不起对账的数字</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>给自己安排了一场模拟技术一面：面试官是一个<strong>只拿到简历原文</strong>的 AI——它对两个项目的代码一无所知，所有问题都从简历表述里长出来；我以候选人身份作答，所有回答都锚在我逐行读过、本地调试过的真实代码上。一方代表”外人的视角”，一方代表”代码的事实”，两边对撞出来的东西，比单向背题有用得多。</p>
+<p>这篇是全程复盘：11 道题的问答要点 + 每题的复盘笔记 + 面试官总评 + 我的修订清单。</p>
+<h2 id="十一题全景"><a href="#十一题全景" class="headerlink" title="十一题全景"></a>十一题全景</h2><table>
+<thead>
+<tr>
+<th>#</th>
+<th>话题</th>
+<th>考点一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>三个业务域怎么分、域间怎么协作</td>
+<td>分域依据 + 协作机制的真实形态</td>
+</tr>
+<tr>
+<td>2</td>
+<td>同库共享怎么防腐化</td>
+<td>约定与机制的区分、强制手段</td>
+</tr>
+<tr>
+<td>3</td>
+<td>试算完整链路 + 责任链 vs 规则树</td>
+<td>设计模式落到调用点、结构选型理由</td>
+</tr>
+<tr>
+<td>4</td>
+<td>线程池三连问</td>
+<td>参数依据、失败处理、池隔离</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Redis 占用名额的回滚归还</td>
+<td>recovery 机制、后果定性</td>
+</tr>
+<tr>
+<td>6</td>
+<td>发件箱两个衔接点</td>
+<td>事务绑定理由、at-least-once 契约</td>
+</tr>
+<tr>
+<td>7</td>
+<td>结算与退款并发</td>
+<td>条件更新 + 行锁的时序推演</td>
+</tr>
+<tr>
+<td>8</td>
+<td>ReAct 循环 vs”单次调用”矛盾</td>
+<td>简历措辞、循环机制、架构取舍</td>
+</tr>
+<tr>
+<td>9</td>
+<td>SSRF 三个载荷</td>
+<td>每个载荷防不防得住、修法</td>
+</tr>
+<tr>
+<td>10</td>
+<td>语义记忆写入与冲突</td>
+<td>筛选逻辑、上下文拼装、矛盾消解</td>
+</tr>
+<tr>
+<td>11</td>
+<td>JVM：P99 恶化排查</td>
+<td>排查路径、工具链、泄漏二分</td>
+</tr>
+</tbody></table>
+<h2 id="拼团七连问"><a href="#拼团七连问" class="headerlink" title="拼团七连问"></a>拼团七连问</h2><h3 id="Q1-三个域怎么分的？域间怎么协作？"><a href="#Q1-三个域怎么分的？域间怎么协作？" class="headerlink" title="Q1 三个域怎么分的？域间怎么协作？"></a>Q1 三个域怎么分的？域间怎么协作？</h3><p><strong>答</strong>：营销活动域、人群标签域、交易域，划分依据是<strong>生命周期</strong>——活动域的东西运营配置时就定死（读多写少），标签域是运营侧批量数据活（离线），交易域处理实时锁单支付退款（并发压力所在）。10 张表各归其主（活动 4、标签 3、交易 3）。域间协作有个刻意原则：<strong>跨域调用不发生在领域层之间</strong>——跨域编排在 trigger 层（Controller 注入两个域的领域服务，先试算后锁单）；交易域读活动配置走自己域的仓储接口，infrastructure 实现里做 PO 到窄实体的转换（防腐层变体）。同进程单体，实际是同步方法调用；数据同库共享是单体期取舍。</p>
+<p><strong>复盘</strong>：这题是准备最充分的一题，要点全部命中。两个加分动作：主动修正简历”7 张表”为 10 张；结尾主动交代”数据层同库共享”的诚实取舍——这句反而成了面试官下一题的钩子。</p>
+<h3 id="Q2-同库共享，工程上怎么防止腐化？"><a href="#Q2-同库共享，工程上怎么防止腐化？" class="headerlink" title="Q2 同库共享，工程上怎么防止腐化？"></a>Q2 同库共享，工程上怎么防止腐化？</h3><p><strong>答</strong>：分两层，因为约束强度不一样。<strong>层与层是编译期强制</strong>——DDD 四层切成 Maven 模块，domain 的 pom 不依赖 infrastructure，领域代码想 import DAO 编译就过不去，这不是约定，是类路径上没有。<strong>域与域目前只是包级隔离</strong>——三个域是同一模块下的三个包，编译器拦不住跨包 import；实际防住靠收口（跨域访问只有仓储实现一个入口，review 面小）加评审纪律，没上 ArchUnit，这是短板。”能维持多久”：小团队能守，团队一大约定一定被冲破。下一步两件事：三个域拆独立 Maven 模块让依赖图像层间一样强制，ArchUnit 进 CI 兜底。</p>
+<p><strong>复盘</strong>：这题的题眼是<strong>分清”约定”和”机制”</strong>——很多候选人会把约定说成机制。主动承认域间没有强制手段，比含糊其辞可信得多；被追问”能维持多久”时给出成本排序的演进方案，是把短板答成规划感的关键。</p>
+<h3 id="Q3-完整试算链路-为什么责任链和规则树都要"><a href="#Q3-完整试算链路-为什么责任链和规则树都要" class="headerlink" title="Q3 完整试算链路 + 为什么责任链和规则树都要"></a>Q3 完整试算链路 + 为什么责任链和规则树都要</h3><p><strong>答</strong>：请求进 Controller 先试算，试算内部是规则树：根节点进 <strong>Switch 节点</strong>读 DCC 动态配置（降级开关、切量比例，运营不发版可拨），过闸进 <strong>Market 节点</strong>——活动&#x2F;折扣&#x2F;人群可见性三路数据 FutureTask 并行加载，按计费类型从 Map 注入的策略集合选算法（直减&#x2F;满减&#x2F;折扣&#x2F;N 元购四种，满减带分摊），最后 <strong>Tag 节点</strong> Bitmap 判人群。树走完 Controller 转实体调锁单服务，锁单域内是<strong>责任链</strong>：活动可用性→参与上限→库存占用，顺序执行、不过即短路。五种模式各归其位：工厂在两条流水线的组装处，模板方法在节点骨架。<strong>树管”算”，链管”审”</strong>——树是带分支的决策编排（降级&#x2F;切量&#x2F;人群是条件分叉，新分支挂子树不动主干），链是无分支的短路流水线（顺序敏感、每关独立可单测）。去掉树，分支全成嵌套 if-else，加分支要改主干；去掉链，校验顺序隐式化、没法按关单测。</p>
+<p><strong>复盘</strong>：面试官明确说”不想听名词罗列”，所以每个模式都落到了具体调用点。结构辨析的落点句——树管算、链管审、分布在不同域不同阶段——是这题的灵魂，没有这句，前面链路背得再熟也只是复述。</p>
+<h3 id="Q4-线程池三连：参数、失败、隔离"><a href="#Q4-线程池三连：参数、失败、隔离" class="headerlink" title="Q4 线程池三连：参数、失败、隔离"></a>Q4 线程池三连：参数、失败、隔离</h3><p><strong>答</strong>：先坦白前提：参数是工程模板默认配置，不是压测调优结果。yml 配置 core 20 &#x2F; max 50 &#x2F; 队列 5000 &#x2F; <strong>CallerRunsPolicy</strong>——三路全是 DB&#x2F;Redis 查询，IO 密集型，核心数高于 CPU 核数方向合理；CallerRuns 对在线接口等于天然背压（不丢请求、把压力传回调用方）。要挑毛病：队列 5000 偏大，<strong>大队列让 max 50 几乎永远触发不了</strong>（队列先填满），高峰期延迟恶化但表面看不出异常。一路失败的处理：现状 fail-fast，FutureTask 异常从 get() 以 ExecutionException 抛出整次试算失败；系统里真实的降级是粗粒度的（Switch 节点 DCC 开关整树降级）。改进按业务语义分层：活动&#x2F;折扣路失败必须失败（无价可算），标签路可失败放行（Bitmap 不存在本就等于不限人群），get() 该加超时。隔离问题<strong>不用假设，现状就是共用</strong>——同一个全局池 bean 被试算、结算、退款补偿多处注入，后台任务灌满队列会把试算延迟一起拖垮，应该按”延迟敏感&#x2F;吞吐型”分池加命名。</p>
+<p><strong>复盘</strong>：三连问的每一问都是”现状是什么 + 为什么这个方向 + 生产该怎么调”的三段式。<strong>承认参数不是压测出来的</strong>是全场最重要的诚实动作之一——校招没有生产调优经验是常态，装有的话一追就穿。</p>
+<h3 id="Q5-DB-回滚了，Redis-多占的名额怎么还？"><a href="#Q5-DB-回滚了，Redis-多占的名额怎么还？" class="headerlink" title="Q5 DB 回滚了，Redis 多占的名额怎么还？"></a>Q5 DB 回滚了，Redis 多占的名额怎么还？</h3><p><strong>答</strong>：<strong>同步记账，不是删也不是减</strong>。锁单服务在数据库事务失败时 catch 住，调 recoveryTeamStock——方法体就一行：对”恢复量 key” INCR，然后 rethrow 让事务回滚。为什么记账不减号：INCR 的返回值是排队序号，每个序号配了一把 SET NX 占位锁，decr 会让序号复用、并发下两个请求拿同一个号，把原子的东西搞乱；记账保持计数器单调，恢复量 +1 让占用判定条件”占用值 &gt; 目标 + 恢复量”多放行一个人，语义等效归还。<strong>不还的后果</strong>：占用虚高、判定偏严、真实名额泄漏——但这是<strong>可用性问题不是超卖问题</strong>（方向是误拒不是误放，DB 条件更新兜底在更里面），且库存 key TTL 绑团队有效期，泄漏存续期有天然上限。退款侧同款机制加固版：MQ at-least-once 会重复消费，所以多一层 SET NX 以 orderId 防重——<strong>这里有个真 bug</strong>：锁的过期时间想设 30 天，毫秒值传成了分钟单位，实际约五万天，等于永不过期；方向保守（多锁不漏锁）不致命，但属于该修的技术债。</p>
+<p><strong>复盘</strong>：面试官后来说这道题”说明你不只是背方案”。这题能答好全靠把 occupyTeamStock 全文读过——“记账 vs 减号”的选择理由、”少卖不是超卖”的定性、30 天变 5 万天的 bug，都只在代码里。<strong>主动交代自己复盘出的 bug</strong> 比装干净加分得多。</p>
+<h3 id="Q6-发件箱的两个衔接点"><a href="#Q6-发件箱的两个衔接点" class="headerlink" title="Q6 发件箱的两个衔接点"></a>Q6 发件箱的两个衔接点</h3><p><strong>答</strong>：<strong>写入时机</strong>：同一个本地事务——结算事务里依次做明细更新、进度加一、满员转完成、notify_task 插入，要么一起提交要么一起回滚。为什么必须绑：不绑只有两种时序——先插记录后提交业务，业务回滚了记录还在，下游收到幽灵通知；先提交后插记录，应用崩溃通知永久丢失。绑在一起，”业务发生”和”消息待发”在数据库层面原子成立，投递变成独立的 at-least-once 问题。<strong>状态机与重复</strong>：初始 0 → 成功置 1 → 未到上限失败置 2 → 超上限置 3 彻底失败；补偿任务每分钟扫 0 和 2。<strong>消息已送达但状态更新失败的场景明确会发生</strong>，所以上下游有契约：notify_task 的 uuid（teamId + 类别 + 外部单号）就是给下游幂等去重用的，上游不做 exactly-once 承诺，去重责任放在有天然业务键的下游。并发投递两把锁：任务入口 Redisson 抢占 + 单条投递 tryLock 等待 0 秒。<strong>重试上限有（notifyCount &gt; 4 停），退避没有</strong>——固定每分钟一轮线性打 5 次，下游长故障时 5 分钟内全打完，该演进指数退避加告警。</p>
+<p><strong>复盘</strong>：”上游 at-least-once + 下游业务键去重”的分工表述是标准正解；退避缺失自己认了，面试官没有纠缠。这题的通用价值：<strong>任何”可靠性保证”都要能说出语义边界</strong>（保证什么、不保证什么、谁兜底），说不出边界的保证都是背的。</p>
+<h3 id="Q7-结算和退款并发打进来，状态怎么不乱？"><a href="#Q7-结算和退款并发打进来，状态怎么不乱？" class="headerlink" title="Q7 结算和退款并发打进来，状态怎么不乱？"></a>Q7 结算和退款并发打进来，状态怎么不乱？</h3><p><strong>答</strong>：没有应用层分布式锁——防并发的是”MySQL 行锁串行化 + 带状态断言的条件更新”。条件更新长这样：结算侧明细 <code>where status=0</code>、<code>complete_count+1 where complete_count &lt; target</code>、主单 <code>set status=1 where status=0</code>；退款侧团队表 <code>lock/complete 各减一 where status=0</code>。<strong>每个 WHERE 都是对前置状态的断言</strong>，断言不成立影响行数 0，抛异常回滚。两个事务都更新同一条团队记录，InnoDB 行锁天然串行化。推两个时序：<strong>结算先提交</strong>——退款事务拿到行锁时读到”已成团”，退款路由按”团队状态×订单状态”组合选策略，自动变成成团后退款（锁单量不恢复，团队转完成含退单），账目语义正确；<strong>退款先提交</strong>——进度各减一，结算后到，complete_count 条件加一后没到 target，<strong>就不转主单不插通知</strong>，这次结算只是一次正常进度推进，不存在”发现人数不够就报错”的分支——满员判定不是结算的前置假设，是条件更新之后对既成事实的读取。兜底是两层的：路由层按读取状态选策略，执行层按提交状态拦截过期判断（读到旧值时 WHERE 不命中 → UPDATE_ZERO → 回滚 → 重试重新路由）。还有一点：这套正确性<strong>不依赖隔离级别玄学</strong>——UPDATE 是当前读，行锁加条件断言在读已提交下也成立。重复回调的幂等被同一套 WHERE 顺手解决。</p>
+<p><strong>复盘</strong>：面试官给的评价是全场最高——“真理解过并发控制才说得出来”。这题的方法论价值：并发场景题不要背结论，<strong>拿着具体的 WHERE 条件推时序</strong>，推得动就是真懂。</p>
+<h2 id="QQ-BOT-三问"><a href="#QQ-BOT-三问" class="headerlink" title="QQ-BOT 三问"></a>QQ-BOT 三问</h2><h3 id="Q8-“ReAct-循环”和”单次-LLM-调用”矛盾吗？"><a href="#Q8-“ReAct-循环”和”单次-LLM-调用”矛盾吗？" class="headerlink" title="Q8 “ReAct 循环”和”单次 LLM 调用”矛盾吗？"></a>Q8 “ReAct 循环”和”单次 LLM 调用”矛盾吗？</h3><p><strong>答</strong>：先纠正简历措辞——“单次调用”想表达<strong>单一入口、统一循环</strong>，不是字面只调一次，这词写得不对。实际机制：消息进统一工具循环，上限 5 轮，每轮调一次 chat_with_tools；模型返回 tool_calls 就并行执行、回填观察、续跑，返回纯文本就终止；实际调用 1 到 5 次，<strong>次数由模型自己决定</strong>。终止条件：文本回答，或 5 轮打满给兜底话术；斜杠命令和纯标点根本不进 LLM。概念掰正：这个循环本身就是 ReAct 的工程化（推理在模型内部完成，我负责行动执行和观察回填），砍掉的是五阶段流水线——Router&#x2F;Planner&#x2F;Executor&#x2F;Reflector&#x2F;Builder。这套真实现过、有单测，上线前整体拿掉，三个业务理由：延迟（群聊等 10 秒就挨骂）、故障面（五阶段可用性连乘）、收益错配（90% 请求是闲聊和单步查询，为极少数复杂任务让所有人陪跑）。</p>
+<p><strong>复盘</strong>：简历措辞被抓包，当场认 + 给准确版本，比辩解体面。<strong>“架构服务于场景，不是服务于架构图”</strong> 这句砍五阶段的总结，是整个 QQ-BOT 项目最值钱的一句面试话术。</p>
+<h3 id="Q9-SSRF：三个载荷能不能防住？"><a href="#Q9-SSRF：三个载荷能不能防住？" class="headerlink" title="Q9 SSRF：三个载荷能不能防住？"></a>Q9 SSRF：三个载荷能不能防住？</h3><p><strong>答</strong>：先定位：校验在<strong>工具入口</strong>做一次性判断（解析成 IP 再对七段私网列表），不在连接层。逐个过：<strong><code>http://0x7f000001/</code> 能防住但属侥幸正确</strong>——十六进制不是合法点分形式，走 DNS 分支，系统解析器按 inet_aton 语义转成 127.0.0.1 命中环回段；但把安全建立在 OS 解析器的宽容度上很脆弱，该显式拒绝非标准主机名。<strong><code>http://[::ffff:127.0.0.1]/</code> 防不住，真洞</strong>——IPv4 映射地址解析成 IPv6 后不命中任何黑名单网段，而 socket 连它会真落到环回；修法是校验前用 ipv4_mapped 展开映射段重查。<strong>302 跳 169.254.169.254 也防不住，同族真洞</strong>——校验只对原始 URL 做一次，客户端自动跟随重定向，每跳不重检；修法是关掉自动跟随、逐跳重跑校验、限跳数，终极方案是把校验点移到连接层（自定义 transport 在建连那一刻断言 IP），重定向和 DNS rebinding 的 TOCTOU 一起终结。</p>
+<p><strong>复盘</strong>：三个载荷一真防住、两真防不住，全认。面试官的评价是”比很多’防住了’的答案更有价值”。<strong>安全题答”防住了”之前先想想能不能被自己绕过</strong>——答不出绕过路径的”防住了”，在懂行的面试官眼里就是没做过。</p>
+<h3 id="Q10-语义记忆：写入、拼装、冲突"><a href="#Q10-语义记忆：写入、拼装、冲突" class="headerlink" title="Q10 语义记忆：写入、拼装、冲突"></a>Q10 语义记忆：写入、拼装、冲突</h3><p><strong>答</strong>：<strong>写入不是每条都存</strong>——回复发出后后台跑 LLM 抽取，取最近 6 条对话，”提取事实、没有输出 NONE”，NONE 哨兵让闲聊显式判空，temperature 0.1 + 200 token 封顶；窗口取 6 条防旧事实重复抽取。<strong>检索拼装</strong>：拿当前消息做 query，带 chat_key 过滤（群间隔离），top5 加前缀拼进上下文，模型看到的是”30 条顺序窗口 + 5 条语义召回”。<strong>咖啡冲突，实际机制：没有冲突消解，两条都进</strong>。语义记忆追加式存储两条共存；画像层是按键 upsert、同键覆盖（最后抽取的赢）。真实效果大概率偏向”他喝美式”——因为昨天那句在工作记忆窗口里且更近——但<strong>模型可能是蒙对的，不是系统保证的</strong>。演进三步：召回记忆带时间标注给模型做时序推理（成本极低、收益立现）；写入时相似冲突触发 LLM 裁决；用户主动纠错命令。</p>
+<p><strong>复盘</strong>：”模型蒙对不是系统保证”这句被面试官点名。<strong>把系统的实际行为和期望行为分开说</strong>，是所有 AI 工程面试的通用高分动作——模糊处不装精确。</p>
+<h2 id="收尾：JVM-场景题"><a href="#收尾：JVM-场景题" class="headerlink" title="收尾：JVM 场景题"></a>收尾：JVM 场景题</h2><h3 id="Q11-试算-P99-从-200ms-涨到-2s，老年代持续攀升，怎么排查？"><a href="#Q11-试算-P99-从-200ms-涨到-2s，老年代持续攀升，怎么排查？" class="headerlink" title="Q11 试算 P99 从 200ms 涨到 2s，老年代持续攀升，怎么排查？"></a>Q11 试算 P99 从 200ms 涨到 2s，老年代持续攀升，怎么排查？</h3><p><strong>答</strong>：三步走。<strong>第一步找分水岭信号</strong>：jstat -gcutil 或 GC 日志，看<strong>每次 Old GC 结束后老年代能不能回到基线</strong>——回收后最低点阶梯式抬升是泄漏曲线；能清干净但很快灌满，是分配&#x2F;晋升速率过高或堆太小。同时看时间相关性：发版、流量、新定时任务。<strong>第二步二分</strong>：jmap -histo 看 Top 对象不停机初筛；泄漏的特征是 Full GC 也挤不出空间。<strong>第三步定位引用链</strong>：jmap -dump 抓两份对比增量，MAT 看 Dominator Tree（找保留堆大的，不是对象本身大的）+ Leak Suspects + Path to GC Roots（排除弱软引用），看到哪个类哪个字段哪个集合攥着它；生产提前配 HeapDumpOnOutOfMemoryError，线上用 Arthas 不停机排查。<strong>结合本系统的三个嫌疑</strong>：ThreadLocal 没 remove（线程池复用线程，请求上下文随长寿线程泄漏）、无淘汰策略的静态缓存、线程池 5000 队列堆积（每个滞留任务攥着请求对象，内存和延迟一起恶化）。修复闭环：回归压测对比 GC 行为，把”GC 后基线”和”停顿 P99”做成告警项。</p>
+<p><strong>复盘</strong>：场景题的高分结构是<strong>路径 + 工具 + 数据 + 自家系统关联</strong>。”GC 后基线抬升当分水岭”是整题的锚；三个嫌疑点全部长在自己项目的真实结构上（试算线程池、DCC&#x2F;Bitmap 缓存、大队列），这不是背的 JVM 八股能有的效果。</p>
+<h2 id="面试官总评"><a href="#面试官总评" class="headerlink" title="面试官总评"></a>面试官总评</h2><blockquote>
+<p>整体是近段时间面过的校招&#x2F;实习候选人里完成度很高的一位，项目不是包装出来的，每个方案都能往下追三层而不塌方。最突出的亮点是工程判断力和诚实度——条件更新两层保证、库存”记账式恢复”、发件箱上下游语义分工这些都能讲到底层依据，而简历数字对不上、五阶段流水线砍掉、SSRF 两个真洞、重试无退避，全是自己先认的，这种”明知取舍且说得出为什么”的表态比无缺点的回答可信得多。短板集中在两点：一是严谨性——简历写 7 张表实际 10 张、”单次 LLM 调用”措辞误导、线程池参数和重试上限都是模板默认值，校招可以没有生产调优经验，但简历是你唯一能提前打磨的门面，数字和措辞必须经得起对账；二是几个自己识别出的待改进项（ArchUnit、指数退避、连接层校验、记忆时序标注）建议挑一两个真正落地，下次面试时”我做完了”的分量远大于”我知道该做”。建议评级：通过，可考虑往上一档定级。</p>
+</blockquote>
+<h2 id="复盘清单"><a href="#复盘清单" class="headerlink" title="复盘清单"></a>复盘清单</h2><p><strong>简历要对账的数字（面试前必改）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>简历表述</th>
+<th>代码事实</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>7 张数据库表</td>
+<td>10 张（活动 4 + 标签 3 + 交易 3）</td>
+</tr>
+<tr>
+<td>11 种注入正则</td>
+<td>13 条（覆盖四类攻击向量）</td>
+</tr>
+<tr>
+<td>“自动从 Python 类型注解生成 schema”</td>
+<td>参数类型来自 params 字典显式声明，required 由 inspect.signature 推断</td>
+</tr>
+<tr>
+<td>500ms → 200ms（提升 60%）</td>
+<td>本地基准测试口径，需主动声明</td>
+</tr>
+<tr>
+<td>“单次 LLM 调用”</td>
+<td>单一循环、1~5 次调用、次数由模型决定</td>
+</tr>
+</tbody></table>
+<p><strong>挑一个真落地（下次面试说”我做完了”）</strong>：指数退避 + 失败告警成本最低（notify_task 已有重试计数字段，退避就是扫描时的间隔计算）；ArchUnit 规则其次。连接层 SSRF 校验最重但最有区分度。</p>
+<p><strong>遗留强化点</strong>：线程池参数压测口径、JVM 排查的实操演练（本地造一个泄漏用 MAT 走一遍全流程）、Redis 主从&#x2F;持久化对”Redis 不是账本”论点的支撑细节。</p>
+<h2 id="写在最后"><a href="#写在最后" class="headerlink" title="写在最后"></a>写在最后</h2><p>这场面试最有价值的产出不是”通过”，而是三条元认知：</p>
+<ol>
+<li><strong>答案的长相取决于证据的深度</strong>。同一道”库存怎么回滚”的问题，背方案的人说”补偿机制”，读过代码的人能画出那行 INCR 并指出它的 5 万天 bug——差距全部来自有没有真的逐行读过自己的项目。</li>
+<li><strong>诚实是校招面试的杠杆而非风险</strong>。11 题里主动认的每一处（数字对不上、防不住、没退避、蒙对的）都没有变成减分项，反而全部成了”明知取舍”的证据。前提是认的时候要带上修法和边界。</li>
+<li><strong>“我知道该做”和”我做完了”隔着一条简历的鸿沟</strong>。面试官最后那句提醒值得贴在墙上：识别出十个改进项不如落地一个。</li>
+</ol>
+<hr>
+<p>系列目录：</p>
+<ul>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">（一）架构总览与领域分域</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/">（二）折扣试算与规则编排</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">（三）库存一致性与幂等</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/">（四）结算回调与退款逆向</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+              <a href="/tags/%E9%9D%A2%E8%AF%95/" rel="tag"># 面试</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%89-%E4%B8%89%E5%B1%82%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F/" rel="prev" title="QQ 群 AI 助手开发记录（三）：三层记忆系统">
+                  <i class="fa fa-angle-left"></i> QQ 群 AI 助手开发记录（三）：三层记忆系统
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

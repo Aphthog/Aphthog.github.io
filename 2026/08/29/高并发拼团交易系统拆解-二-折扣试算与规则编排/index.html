@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="系列第 2 篇：试算接口的规则树编排、DCC 动态开关、策略模式的 Map 注入路由、模板方法收敛公共逻辑，以及 500ms 到 200ms 的并行化推导">
+<meta property="og:type" content="article">
+<meta property="og:title" content="高并发拼团交易系统拆解（二）：折扣试算与规则编排">
+<meta property="og:url" content="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="系列第 2 篇：试算接口的规则树编排、DCC 动态开关、策略模式的 Map 注入路由、模板方法收敛公共逻辑，以及 500ms 到 200ms 的并行化推导">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-29T10:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="DDD">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="项目">
+<meta property="article:tag" content="高并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/","path":"2026/08/29/高并发拼团交易系统拆解-二-折扣试算与规则编排/","title":"高并发拼团交易系统拆解（二）：折扣试算与规则编排"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>高并发拼团交易系统拆解（二）：折扣试算与规则编排 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="高并发拼团交易系统拆解（二）：折扣试算与规则编排 | Camille">
+      <meta itemprop="description" content="系列第 2 篇：试算接口的规则树编排、DCC 动态开关、策略模式的 Map 注入路由、模板方法收敛公共逻辑，以及 500ms 到 200ms 的并行化推导">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          高并发拼团交易系统拆解（二）：折扣试算与规则编排
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-29 10:00:00" itemprop="dateCreated datePublished" datetime="2026-08-29T10:00:00+00:00">2026-08-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">系列第 2 篇：试算接口的规则树编排、DCC 动态开关、策略模式的 Map 注入路由、模板方法收敛公共逻辑，以及 500ms 到 200ms 的并行化推导</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>试算接口——用户打开拼团页看到”XX 元拼团结算”——是全系统流量最大的入口。这一篇拆它的两件事：<strong>编排</strong>（一堆校验和计算按什么顺序跑、怎么优雅降级）和<strong>计算</strong>（四种折扣怎么算、怎么扩展）。</p>
+<blockquote>
+<p>系列目录见<a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">第一篇</a>。</p>
+</blockquote>
+<h2 id="规则树：把-if-else-编排成一棵树"><a href="#规则树：把-if-else-编排成一棵树" class="headerlink" title="规则树：把 if&#x2F;else 编排成一棵树"></a>规则树：把 if&#x2F;else 编排成一棵树</h2><p>试算的流程是：参数校验 → 降级&#x2F;切量判断 → 拿活动配置和商品信息 → 算折扣 → 人群可见性判断 → 出结果。用 ifs 写就是一坨 200 行的主方法；这里把它编排成一棵规则树：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">RootNode（参数校验）</span><br><span class="line">   └─ SwitchNode（降级开关 / 切量判断）</span><br><span class="line">        └─ MarketNode（异步装配数据 + 折扣计算）</span><br><span class="line">             └─ TagNode（人群可见 / 可参与）</span><br><span class="line">                  └─ EndNode（组装试算结果）</span><br><span class="line">任何节点发现无配置 → 旁路 ErrorNode 兜底</span><br></pre></td></tr></table></figure>
+
+<p>树框架来自 wrench 的 <code>AbstractMultiThreadStrategyRouter</code>，每个节点实现两个方法：<code>doApply()</code>（本节点业务）和 <code>get()</code>（路由到哪个下级节点）。以 SwitchNode 为例：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// SwitchNode.doApply —— 降级/切量两道闸</span></span><br><span class="line"><span class="comment">// 判断是否降级</span></span><br><span class="line"><span class="keyword">if</span> (repository.downgradeSwitch()) &#123;</span><br><span class="line">    log.info(<span class="string">&quot;拼团活动降级拦截 &#123;&#125;&quot;</span>, userId);</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">AppException</span>(ResponseCode.E0003.getCode(), ResponseCode.E0003.getInfo());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 切量范围判断</span></span><br><span class="line"><span class="keyword">if</span> (!repository.cutRange(userId)) &#123;</span><br><span class="line">    log.info(<span class="string">&quot;拼团活动切量拦截 &#123;&#125;&quot;</span>, userId);</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">AppException</span>(ResponseCode.E0004.getCode(), ResponseCode.E0004.getInfo());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">return</span> router(requestParameter, dynamicContext);</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// MarketNode.get() —— 数据缺失走异常节点，否则进人群判断</span></span><br><span class="line"><span class="comment">// 不存在配置的拼团活动，走异常节点</span></span><br><span class="line"><span class="keyword">if</span> (<span class="literal">null</span> == dynamicContext.getGroupBuyActivityDiscountVO() || <span class="literal">null</span> == dynamicContext.getSkuVO() || <span class="literal">null</span> == dynamicContext.getDeductionPrice()) &#123;</span><br><span class="line">    <span class="keyword">return</span> errorNode;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">return</span> tagNode;</span><br></pre></td></tr></table></figure>
+
+<p>TagNode 处理人群可见性，注意空配置的语义：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TagNode.doApply —— 人群标签配置为空，则走默认值</span></span><br><span class="line"><span class="keyword">if</span> (StringUtils.isBlank(tagId)) &#123;</span><br><span class="line">    dynamicContext.setVisible(<span class="literal">true</span>);</span><br><span class="line">    dynamicContext.setEnable(<span class="literal">true</span>);</span><br><span class="line">    <span class="keyword">return</span> router(requestParameter, dynamicContext);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 是否在人群范围内；visible、enable 如果值为 true 则表示没有配置拼团限制，直接置 true</span></span><br><span class="line"><span class="type">boolean</span> <span class="variable">isWithin</span> <span class="operator">=</span> repository.isTagCrowdRange(tagId, requestParameter.getUserId());</span><br><span class="line">dynamicContext.setVisible(visible || isWithin);</span><br><span class="line">dynamicContext.setEnable(enable || isWithin);</span><br></pre></td></tr></table></figure>
+
+<p>节点间的数据靠 <code>DynamicContext</code> 传递——SwitchNode 写开关结论、MarketNode 写活动配置&#x2F;Sku&#x2F;优惠价、TagNode 写可见性，EndNode 统一组装。<strong>每个节点只读上下文、只写自己的字段</strong>，加节点、调顺序都不碰别人的代码。</p>
+<h2 id="DCC：开关为什么能”秒级生效”"><a href="#DCC：开关为什么能”秒级生效”" class="headerlink" title="DCC：开关为什么能”秒级生效”"></a>DCC：开关为什么能”秒级生效”</h2><p>SwitchNode 里那两个开关来自动态配置中心（DCC）：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// DCCService —— 注解默认值：降级关、切量 100%</span></span><br><span class="line"><span class="meta">@DCCValue(&quot;downgradeSwitch:0&quot;)</span></span><br><span class="line"><span class="keyword">private</span> String downgradeSwitch;</span><br><span class="line"></span><br><span class="line"><span class="meta">@DCCValue(&quot;cutRange:100&quot;)</span></span><br><span class="line"><span class="keyword">private</span> String cutRange;</span><br></pre></td></tr></table></figure>
+
+<p><code>@DCCValue</code> 是自研的一个注解（wrench 框架）：启动时把 <code>downgradeSwitch</code> 这个 key 以默认值 <code>0</code> 写进 Redis，并订阅这个 key 的变更；运营在管理端把值改成 <code>1</code>，Redis pub&#x2F;sub 推到所有实例，字段值直接更新——<strong>不重启、不发版，秒级把试算接口整体降级</strong>。<code>cutRange</code> 同理：改成 <code>30</code> 就是只放 30% 的用户进来（按 userId 哈希），新功能灰度的标准打法。</p>
+<p>大促场景里这类开关是保命符：下游 DB 有压力，第一反应不该是扩容，而是把非核心流量降掉。</p>
+<h2 id="策略模式-Map-注入：路由不用工厂"><a href="#策略模式-Map-注入：路由不用工厂" class="headerlink" title="策略模式 + Map 注入：路由不用工厂"></a>策略模式 + Map 注入：路由不用工厂</h2><p>四种折扣：直减（ZJ）、折扣（ZK）、满减（MJ）、N 元购（N）。路由的选择上我没有手写 <code>if/else</code>，也没有写工厂类——<strong>用 Spring 自己当工厂</strong>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// MarketNode.doApply</span></span><br><span class="line"><span class="meta">@Resource</span></span><br><span class="line"><span class="keyword">private</span> Map&lt;String, IDiscountCalculateService&gt; discountCalculateServiceMap;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 优惠试算——按配置里的 marketPlan 取策略</span></span><br><span class="line"><span class="type">IDiscountCalculateService</span> <span class="variable">discountCalculateService</span> <span class="operator">=</span> discountCalculateServiceMap.get(groupBuyDiscount.getMarketPlan());</span><br><span class="line"><span class="keyword">if</span> (<span class="literal">null</span> == discountCalculateService) &#123;</span><br><span class="line">    log.info(<span class="string">&quot;不存在&#123;&#125;类型的折扣计算服务...&quot;</span>, groupBuyDiscount.getMarketPlan());</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">AppException</span>(ResponseCode.E0001.getCode(), ResponseCode.E0001.getInfo());</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 折扣价格</span></span><br><span class="line"><span class="type">BigDecimal</span> <span class="variable">payPrice</span> <span class="operator">=</span> discountCalculateService.calculate(requestParameter.getUserId(), skuVO.getOriginalPrice(), groupBuyDiscount);</span><br></pre></td></tr></table></figure>
+
+<p>每个实现类用 <code>@Service(&quot;MJ&quot;)</code> 这样的 bean name 注册，Spring 会把所有 <code>IDiscountCalculateService</code> 实现按名字收进这个 Map。<strong>新增一种折扣 &#x3D; 新增一个类，路由代码零改动</strong>。比工厂模式少一层无意义的转发代码，比 if&#x2F;else 少一处要维护的分支表。</p>
+<h2 id="模板方法：公共逻辑上提，子类只管算数"><a href="#模板方法：公共逻辑上提，子类只管算数" class="headerlink" title="模板方法：公共逻辑上提，子类只管算数"></a>模板方法：公共逻辑上提，子类只管算数</h2><p>折扣计算有一段公共前置——限定人群的优惠要先过滤人群。这段逻辑收敛在抽象父类，用模板方法固定骨架：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// AbstractDiscountCalculateService.calculate</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> BigDecimal <span class="title function_">calculate</span><span class="params">(String userId, BigDecimal originalPrice,</span></span><br><span class="line"><span class="params">                            GroupBuyActivityDiscountVO.GroupBuyDiscount groupBuyDiscount)</span> &#123;</span><br><span class="line">    <span class="comment">// 1. 人群标签过滤——限定人群的优惠，不在范围内按原价</span></span><br><span class="line">    <span class="keyword">if</span> (DiscountTypeEnum.TAG.equals(groupBuyDiscount.getDiscountType()))&#123;</span><br><span class="line">        <span class="type">boolean</span> <span class="variable">isCrowdRange</span> <span class="operator">=</span> filterTagId(userId, groupBuyDiscount.getTagId());</span><br><span class="line">        <span class="keyword">if</span> (!isCrowdRange) &#123;</span><br><span class="line">            <span class="keyword">return</span> originalPrice;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 2. 折扣优惠计算——子类各自实现</span></span><br><span class="line">    <span class="keyword">return</span> doCalculate(originalPrice, groupBuyDiscount);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>子类只关心自己的数学，比如满减 MJ：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// MJCalculateService.doCalculate</span></span><br><span class="line"><span class="comment">// 折扣表达式 - &quot;100,10&quot; 即满100减10元</span></span><br><span class="line">String[] split = marketExpr.split(Constants.SPLIT);</span><br><span class="line"><span class="type">BigDecimal</span> <span class="variable">x</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">BigDecimal</span>(split[<span class="number">0</span>].trim());</span><br><span class="line"><span class="type">BigDecimal</span> <span class="variable">y</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">BigDecimal</span>(split[<span class="number">1</span>].trim());</span><br><span class="line"></span><br><span class="line"><span class="keyword">if</span> (originalPrice.compareTo(x) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> originalPrice;                      <span class="comment">// 不满足满减门槛，按原价</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="type">BigDecimal</span> <span class="variable">deductionPrice</span> <span class="operator">=</span> originalPrice.subtract(y);</span><br><span class="line"><span class="keyword">if</span> (deductionPrice.compareTo(BigDecimal.ZERO) &lt;= <span class="number">0</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">BigDecimal</span>(<span class="string">&quot;0.01&quot;</span>);             <span class="comment">// 最低支付1分钱</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">return</span> deductionPrice;</span><br></pre></td></tr></table></figure>
+
+<p>三类金额细节，是营销系统的红线：</p>
+<ul>
+<li>全程 <code>BigDecimal</code>，比较用 <code>compareTo</code> 不用 <code>equals</code>（<code>equals</code> 连 scale 一起比，<code>1.0</code> 和 <code>1.00</code> 不相等）；</li>
+<li>最终支付价 <code>setScale(0, RoundingMode.DOWN)</code> 向下取整——向上会让用户多付，向下是平台让利，<strong>方向错了就是资损或客诉</strong>；</li>
+<li>兜底价 0.01 元而不是 0 元——0 元单在很多支付渠道走不通，也便于区分”免费”和”优惠到 0”。</li>
+</ul>
+<h2 id="异步装配：500ms-到-200ms-的推导"><a href="#异步装配：500ms-到-200ms-的推导" class="headerlink" title="异步装配：500ms 到 200ms 的推导"></a>异步装配：500ms 到 200ms 的推导</h2><p>MarketNode 是树的计算核心，它需要两路数据：活动折扣配置、Sku 商品信息。两路查询相互独立，串行就是两次 DB 往返叠加。这里用线程池并行发起，统一 <code>get</code>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// MarketNode.multiThread —— 两路查询并行，再统一写入上下文</span></span><br><span class="line"><span class="type">QueryGroupBuyActivityDiscountVOThreadTask</span> <span class="variable">queryTask</span> <span class="operator">=</span></span><br><span class="line">        <span class="keyword">new</span> <span class="title class_">QueryGroupBuyActivityDiscountVOThreadTask</span>(..., repository);</span><br><span class="line">FutureTask&lt;GroupBuyActivityDiscountVO&gt; activityTask = <span class="keyword">new</span> <span class="title class_">FutureTask</span>&lt;&gt;(queryTask);</span><br><span class="line">threadPoolExecutor.execute(activityTask);</span><br><span class="line"></span><br><span class="line"><span class="type">QuerySkuVOFromDBThreadTask</span> <span class="variable">skuTask</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">QuerySkuVOFromDBThreadTask</span>(goodsId, repository);</span><br><span class="line">FutureTask&lt;SkuVO&gt; skuVOFutureTask = <span class="keyword">new</span> <span class="title class_">FutureTask</span>&lt;&gt;(skuTask);</span><br><span class="line">threadPoolExecutor.execute(skuVOFutureTask);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 写入上下文——前置查询数据，供后续节点直接取用</span></span><br><span class="line">dynamicContext.setGroupBuyActivityDiscountVO(activityTask.get(timeout, TimeUnit.MILLISECONDS));</span><br><span class="line">dynamicContext.setSkuVO(skuVOFutureTask.get(timeout, TimeUnit.MILLISECONDS));</span><br></pre></td></tr></table></figure>
+
+<h3 id="数字怎么来的：面试时这么讲"><a href="#数字怎么来的：面试时这么讲" class="headerlink" title="数字怎么来的：面试时这么讲"></a>数字怎么来的：面试时这么讲</h3><p>串行耗时 ≈ <code>T活动查询 + T商品查询 + T计算</code>；并行后 ≈ <code>max(T活动查询, T商品查询) + T计算</code>。</p>
+<p>假设单次 DB 查询 80<del>150ms（含网络往返 + MyBatis 映射），再叠加参数校验、序列化和树路由的固定开销：串行全链路 ≈ 400</del>600ms，并行后 ≈ 180~250ms。<strong>500ms → 200ms 就是这么来的</strong>——本地压测的观测值，绝对值随环境浮动，但量级可复现。面试时先讲结构（两路独立查询并行化、<code>get(timeout)</code> 统一收口），再给数字，并主动说明是本地压测口径——比报一个说不清来源的数字可信得多。</p>
+<p>代码里还留了一个 <code>MarketNode2CompletableFuture</code> 的备选实现，源码注释里有张对比表，摘录要点：</p>
+<table>
+<thead>
+<tr>
+<th align="left">对比维度</th>
+<th align="left">FutureTask</th>
+<th align="left">CompletableFuture</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">任务编排</td>
+<td align="left">弱（手动管理多个 Future）</td>
+<td align="left">强（thenApply、allOf）</td>
+</tr>
+<tr>
+<td align="left">代码简洁性</td>
+<td align="left">冗余（显式 get()）</td>
+<td align="left">简洁（链式调用）</td>
+</tr>
+<tr>
+<td align="left">异常处理</td>
+<td align="left">繁琐（逐个捕获）</td>
+<td align="left">优雅（exceptionally 统一处理）</td>
+</tr>
+<tr>
+<td align="left">适用场景</td>
+<td align="left">简单任务</td>
+<td align="left">复杂异步编排</td>
+</tr>
+</tbody></table>
+<p>两路并行这种简单场景，FutureTask 够用；如果以后要”查询 A 的结果作为查询 B 的入参”这种带依赖的编排，就该换 CompletableFuture。<strong>切换实现只需换 <code>@Service</code> 注解</strong>——树框架把节点隔离得足够好，换内核不动外壳。</p>
+<h2 id="面试追问预演"><a href="#面试追问预演" class="headerlink" title="面试追问预演"></a>面试追问预演</h2><p><strong>Q: 为什么用规则树不是责任链？</strong><br>A: 责任链是线性的”过五关斩六将”，任何一关拦下就结束；试算的流程有分支和旁路（无配置走 ErrorNode、数据缺失跳计算），树结构的 <code>get()</code> 显式表达”下一步去哪”，语义更贴。锁单那种纯串联校验，系列第三篇会看到用的就是责任链。</p>
+<p><strong>Q: 降级开关放 Redis，Redis 挂了怎么办？</strong><br>A: <code>@DCCValue</code> 注解字段在 JVM 内存里有默认值兜底（<code>downgradeSwitch:0</code>），Redis 不可达时读的是本地缓存值，不会因为配置中心故障导致接口不可用。</p>
+<p><strong>Q: 线程池参数怎么配的？打满了怎么办？</strong><br>A: 核心数按 CPU 密集为主配小值，队列有界，拒绝策略抛异常快速失败——试算是入口接口，宁可拒绝也不能堆积拖垮整台机器。<code>get(timeout)</code> 里的 timeout 是最后一道闸，两路查询超过阈值直接走降级分支。</p>
+<p><strong>Q: 金额为什么不能用 double？</strong><br>A: 二进制浮点表示不了 0.1 这类十进制小数，累加会漂移；营销侧金额计算错一分都是资损事故。BigDecimal + <code>compareTo</code> + 向下取整是组合拳。</p>
+<hr>
+<p>系列目录：</p>
+<ul>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">（一）架构总览与领域分域</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/">（二）折扣试算与规则编排</a>（本篇）</li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">（三）库存一致性与幂等</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/">（四）结算回调与退款逆向</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+              <a href="/tags/%E9%AB%98%E5%B9%B6%E5%8F%91/" rel="tag"># 高并发</a>
+              <a href="/tags/DDD/" rel="tag"># DDD</a>
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/" rel="prev" title="高并发拼团交易系统拆解（一）：架构总览与领域分域">
+                  <i class="fa fa-angle-left"></i> 高并发拼团交易系统拆解（一）：架构总览与领域分域
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/" rel="next" title="高并发拼团交易系统拆解（三）：库存一致性与幂等">
+                  高并发拼团交易系统拆解（三）：库存一致性与幂等 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

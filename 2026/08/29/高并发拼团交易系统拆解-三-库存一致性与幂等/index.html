@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="系列第 3 篇：防超卖三层防线（INCR 快拒、恢复量记账、SET NX 兜底、条件更新封盘）、责任链锁单校验、四处幂等的四种打法，以及一个真实的时间单位 bug">
+<meta property="og:type" content="article">
+<meta property="og:title" content="高并发拼团交易系统拆解（三）：库存一致性与幂等">
+<meta property="og:url" content="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="系列第 3 篇：防超卖三层防线（INCR 快拒、恢复量记账、SET NX 兜底、条件更新封盘）、责任链锁单校验、四处幂等的四种打法，以及一个真实的时间单位 bug">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-29T11:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="DDD">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="项目">
+<meta property="article:tag" content="高并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/","path":"2026/08/29/高并发拼团交易系统拆解-三-库存一致性与幂等/","title":"高并发拼团交易系统拆解（三）：库存一致性与幂等"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>高并发拼团交易系统拆解（三）：库存一致性与幂等 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="高并发拼团交易系统拆解（三）：库存一致性与幂等 | Camille">
+      <meta itemprop="description" content="系列第 3 篇：防超卖三层防线（INCR 快拒、恢复量记账、SET NX 兜底、条件更新封盘）、责任链锁单校验、四处幂等的四种打法，以及一个真实的时间单位 bug">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          高并发拼团交易系统拆解（三）：库存一致性与幂等
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-29 11:00:00" itemprop="dateCreated datePublished" datetime="2026-08-29T11:00:00+00:00">2026-08-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">系列第 3 篇：防超卖三层防线（INCR 快拒、恢复量记账、SET NX 兜底、条件更新封盘）、责任链锁单校验、四处幂等的四种打法，以及一个真实的时间单位 bug</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>拼团组队库存是典型的热点计数：一支 2 人队，最后 1 个名额放出来，可能同时有几百个请求在抢。这一篇拆系统的防超卖组合拳，以及交易系统里无处不在的幂等。</p>
+<blockquote>
+<p>系列目录见<a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">第一篇</a>。</p>
+</blockquote>
+<h2 id="总体思路：越便宜的层，挡掉越多的流量"><a href="#总体思路：越便宜的层，挡掉越多的流量" class="headerlink" title="总体思路：越便宜的层，挡掉越多的流量"></a>总体思路：越便宜的层，挡掉越多的流量</h2><p>防线共三层，流量的漏斗是这样的：</p>
+<ol>
+<li><strong>Controller 预检</strong>——纯内存&#x2F;单次读，挡掉”队伍已满还在重试”的流量；</li>
+<li><strong>Redis INCR 原子抢占</strong>——真正的主力，99% 的并发在这里被裁决；</li>
+<li><strong>MySQL 条件更新</strong>——最终裁决，Redis 不是账本，DB 才是正确性边界。</li>
+</ol>
+<p><strong>第一层</strong>是锁单入口先查拼团进度，<code>targetCount == lockCount</code> 直接拒绝，请求根本不进领域逻辑。成本几乎为零，但挡掉的往往是最大的一股流量——满员的队伍会持续收到无效重试。</p>
+<p><strong>第二层</strong>是核心，完整看这段：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TradeRepository.occupyTeamStock</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="keyword">public</span> <span class="type">boolean</span> <span class="title function_">occupyTeamStock</span><span class="params">(String teamStockKey, String recoveryTeamStockKey,</span></span><br><span class="line"><span class="params">                               Integer target, Integer validTime)</span> &#123;</span><br><span class="line">    <span class="comment">// 失败恢复量</span></span><br><span class="line">    <span class="type">Long</span> <span class="variable">recoveryCount</span> <span class="operator">=</span> redisService.getAtomicLong(recoveryTeamStockKey);</span><br><span class="line">    recoveryCount = <span class="literal">null</span> == recoveryCount ? <span class="number">0</span> : recoveryCount;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 1. incr 得到值，与总量和恢复量做对比。恢复量为系统失败时候记录的量。</span></span><br><span class="line">    <span class="comment">// 2. 从有组队量开始，相当于已经有了一个占用量，所以要 +1</span></span><br><span class="line">    <span class="type">long</span> <span class="variable">occupy</span> <span class="operator">=</span> redisService.incr(teamStockKey) + <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (occupy &gt; target + recoveryCount) &#123;</span><br><span class="line">        <span class="comment">// 超出库存限制时，需要将已经增加的库存减回去，避免库存泄漏</span></span><br><span class="line">        redisService.decr(teamStockKey);</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">false</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 1. 给每个产生的值加锁为兜底设计，虽然 incr 操作是原子的，基本不会产生一样的值。</span></span><br><span class="line">    <span class="comment">//    但在实际生产中，遇到过集群的运维配置问题，以及业务运营配置数据问题，导致 incr 得到的值相同。</span></span><br><span class="line">    <span class="comment">// 2. validTime + 60 分钟，是一个延后时间的设计，让数据保留时间稍微长一些，便于排查问题。</span></span><br><span class="line">    <span class="type">String</span> <span class="variable">lockKey</span> <span class="operator">=</span> teamStockKey + Constants.UNDERLINE + occupy;</span><br><span class="line">    <span class="type">Boolean</span> <span class="variable">lock</span> <span class="operator">=</span> redisService.setNx(lockKey, validTime + <span class="number">60</span>, TimeUnit.MINUTES);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!lock) &#123;</span><br><span class="line">        log.info(<span class="string">&quot;组队库存加锁失败 &#123;&#125;&quot;</span>, lockKey);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> lock;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>三个细节值得咀嚼：</p>
+<ol>
+<li><strong>INCR 返回值即”排队号”</strong>。每次 INCR 拿到全局唯一递增值，<code>occupy &gt; target + recoveryCount</code> 一比对就知道超没超，超了立刻 DECR 回补。比”先 SETNX 抢名额、超了再回滚”少一次网络往返。</li>
+<li><strong>恢复量 key 是独立的账本</strong>。这是设计里最妙的一笔，下面单独讲。</li>
+<li><strong>SET NX 兜底锁的来源是真实生产事故</strong>。注释写得很直白：INCR 理论上原子且不重复，但”遇到过集群的运维配置问题，以及业务运营配置数据问题，导致 incr 得到的值相同”。给每个排队号再配一把锁，重复值就能被识别。<strong>理论原子性和工程现实之间的差距，靠防御性设计来填</strong>——<code>validTime + 60</code> 分钟的延长过期也是为了保留现场排查问题。</li>
+</ol>
+<h3 id="恢复量-key：为什么失败不直接-DECR"><a href="#恢复量-key：为什么失败不直接-DECR" class="headerlink" title="恢复量 key：为什么失败不直接 DECR"></a>恢复量 key：为什么失败不直接 DECR</h3><p>锁单流程是”先抢 Redis 库存 → 再落库”。落库失败时，占掉的名额要还回去。直觉做法是 DECR 占用 key，但这有个隐蔽问题：<strong>占用计数里的每个值可能已经有主</strong>（SET NX 锁着、请求还在往下走），直接 DECR 会把”计数减回去”，可那个名额对应的排队号和锁还挂着，账目就乱了。</p>
+<p>系统的做法是失败时 INCR 一个独立的恢复量 key：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TradeLockOrderService —— 落库失败，记录失败恢复量并抛出</span></span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> repository.lockMarketPayOrder(groupBuyOrderAggregate);</span><br><span class="line">&#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">    <span class="comment">// 记录失败恢复量</span></span><br><span class="line">    repository.recoveryTeamStock(tradeLockRuleFilterBackEntity.getRecoveryTeamStockKey(),</span><br><span class="line">                                 payActivityEntity.getValidTime());</span><br><span class="line">    <span class="keyword">throw</span> e;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>判断阈值随之变成 <code>occupy &gt; target + recoveryCount</code>：恢复的名额不回到”占用”里，而是抬高”可占总量”，让后来的请求可以重新占上。<strong>失败退回的名额可以被重新使用，但两本账不混</strong>——这比 DECR 回滚的方案多一个 key，少一类对不上的账。</p>
+<h2 id="责任链：锁单前的三道关卡"><a href="#责任链：锁单前的三道关卡" class="headerlink" title="责任链：锁单前的三道关卡"></a>责任链：锁单前的三道关卡</h2><p>进入库存抢占之前，锁单请求要过一条责任链：<strong>活动可用性 → 用户参与上限 → 组队库存抢占</strong>。每个节点只做一件事，<code>return next(...)</code> 透传：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// TeamStockOccupyRuleFilter —— 链上最后一环</span></span><br><span class="line"><span class="comment">// 1. teamId 为空，则为首次开团，不做拼团组队目标量库存限制</span></span><br><span class="line"><span class="keyword">if</span> (StringUtils.isBlank(teamId)) &#123;</span><br><span class="line">    <span class="keyword">return</span> TradeLockRuleFilterBackEntity.builder()</span><br><span class="line">            .userTakeOrderCount(dynamicContext.getUserTakeOrderCount())</span><br><span class="line">            .build();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 2. 抢占库存；通过抢占 Redis 缓存库存，来降低对数据库的操作压力。</span></span><br><span class="line"><span class="type">boolean</span> <span class="variable">status</span> <span class="operator">=</span> repository.occupyTeamStock(teamStockKey, recoveryTeamStockKey, target, validTime);</span><br><span class="line"><span class="keyword">if</span> (!status) &#123;</span><br><span class="line">    <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">AppException</span>(ResponseCode.E0008);   <span class="comment">// 缓存库存不足</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>注意”teamId 为空 &#x3D; 首次开团不抢库存”——开团的人不需要名额判断（名额从 0 开始计数），只有加入已有队伍才要抢。责任链的价值在可插拔：以后要加黑名单过滤、渠道限制，加一个节点类、在工厂 <code>@Bean</code> 里添一个参数就行。节点间数据用 <code>DynamicContext</code> 传递（第一关查到的活动实体、第二关查到的参与次数），避免重复查库。</p>
+<h2 id="第三层：MySQL-条件更新，正确性的最终边界"><a href="#第三层：MySQL-条件更新，正确性的最终边界" class="headerlink" title="第三层：MySQL 条件更新，正确性的最终边界"></a>第三层：MySQL 条件更新，正确性的最终边界</h2><p>Redis 挡了 99% 的流量，但 Redis 不是账本——主从延迟、持久化窗口、恢复量重放都可能造成计数偏差。落库时用条件更新做最终裁决：</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">update</span> <span class="attr">id</span>=<span class="string">&quot;updateAddLockCount&quot;</span> <span class="attr">parameterType</span>=<span class="string">&quot;java.lang.String&quot;</span>&gt;</span></span><br><span class="line">    update group_buy_order</span><br><span class="line">    set lock_count = lock_count + 1, update_time= now()</span><br><span class="line">    where team_id = #&#123;teamId&#125; and lock_count <span class="symbol">&amp;lt;</span> target_count</span><br><span class="line"><span class="tag">&lt;/<span class="name">update</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p><code>where lock_count &lt; target_count</code> 让数据库自己保证不超卖——MySQL 对同一行的更新在行锁下是串行化的，并发请求排队过闸，闸门就是这条 where。影响行数不等于 1 说明拼团已满，抛异常回滚整个事务。<strong>Redis 是性能优化，DB 的条件更新才是正确性边界</strong>，这个主次关系在很多”Redis 库存”方案里被搞反了——把账本职责交给缓存，出了不一致连对账的基准都没有。</p>
+<h2 id="幂等：四处四把锁"><a href="#幂等：四处四把锁" class="headerlink" title="幂等：四处四把锁"></a>幂等：四处四把锁</h2><p>交易系统里重复请求是常态：用户重复点击、MQ at-least-once 重试、定时任务重跑。这个系统四处幂等各有打法，原则统一——<strong>唯一键 + 状态条件更新 + 抢占锁</strong>：</p>
+<ol>
+<li><strong>锁单幂等</strong>：外部交易单号 <code>out_trade_no</code> 贯穿全链路。锁单先按它查已有记录，存在且未完成直接返回原结果；插入时唯一索引兜底，<code>DuplicateKeyException</code> 转业务异常。</li>
+<li><strong>结算幂等</strong>：状态流转全走条件更新（<code>where status = 0</code>），重复结算影响行数为 0，天然幂等。</li>
+<li><strong>退款幂等</strong>：责任链里有专门的 <code>UniqueRefundNodeFilter</code>，查到订单已 CLOSE 就返回 <code>REPEAT</code> 行为枚举，不重复执行退款。</li>
+<li><strong>库存恢复幂等</strong>：MQ 消费退单消息恢复库存时，<code>SET NX(&quot;refund_lock_&quot; + orderId)</code> 防重复消费——同一订单的消息来两次，第二次拿不到锁直接跳过；消费抛异常主动删锁，让 MQ 下次重试还能进来。</li>
+</ol>
+<h3 id="一个真实的-bug：时间单位"><a href="#一个真实的-bug：时间单位" class="headerlink" title="一个真实的 bug：时间单位"></a>一个真实的 bug：时间单位</h3><p>复盘库存恢复这段代码时，我在 <code>refund2AddRecovery</code> 里发现一个真实的缺陷：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 本意：锁 30 天，防同一订单的退单消息被重复消费</span></span><br><span class="line"><span class="comment">// 实际：</span></span><br><span class="line">redisService.setNx(lockKey, <span class="number">30</span> * <span class="number">24</span> * <span class="number">60</span> * <span class="number">60</span> * <span class="number">1000L</span>, TimeUnit.MINUTES);</span><br><span class="line"><span class="comment">//                          ^^^^^^^^^^^^^^^^^^^^^^ 毫秒值传进了&quot;分钟&quot;单位参数</span></span><br></pre></td></tr></table></figure>
+
+<p><code>30*24*60*60*1000L</code> 是 30 天的<strong>毫秒数</strong>（25.9 亿），却传给了以<strong>分钟</strong>为单位的参数——实际过期时间约 5 万天，一百多年。幂等锁永不失效在这个场景里”歪打正着”地安全（锁越久越不会重复恢复库存），但如果这个订单要重新参与拼团，这把锁就成了永久路障。</p>
+<p>教训记两条：<strong>过期时间的数值和单位要当公式对待，不能心算</strong>；以及读代码要带着”这段在什么条件下会坏”的眼光——单位不匹配这种 bug，功能测试根本测不出来，它只在时间维度上生效。</p>
+<h2 id="面试追问预演"><a href="#面试追问预演" class="headerlink" title="面试追问预演"></a>面试追问预演</h2><p><strong>Q: INCR 之后服务挂了、DECR 没执行，库存不就少了？</strong><br>A: 少占的是”边缘名额”，且 DB 条件更新是最终裁决——Redis 少计只会让请求提前被拒，不会超卖。恢复量 key 再把落库失败的名额记账放回。极端对不上的情况，以 DB 数据为准做校准任务。</p>
+<p><strong>Q: INCR 已经原子了，SET NX 有必要吗？</strong><br>A: 理论上没必要，但源码注释记录了真实生产案例：集群运维配置、运营配置数据问题导致 INCR 返回了相同值。SET NX 是给”小概率但发生过”的事故上的保险，成本是一次额外命令。</p>
+<p><strong>Q: 为什么不用 Lua 脚本把 INCR + 判断 + DECR 原子化？</strong><br>A: 可以，Lua 是更彻底的方案。当前实现的 INCR&#x2F;比较&#x2F;DECR 之间没有依赖判断的中间状态暴露（比较基于返回值在应用侧做），竞态窗口不影响正确性——超占的那次 DECR 一定会执行。换 Lua 的收益是减少往返，不是修正确性。</p>
+<p><strong>Q: Redis 和 DB 库存不一致怎么发现？</strong><br>A: 对账任务扫 DB 中 <code>lock_count</code> 与 Redis 计数比对；本系统里结算走 DB 条件更新，不一致的影响被限制在”多拒”或”多放后被 DB 拦下”，不产生资损。</p>
+<hr>
+<p>系列目录：</p>
+<ul>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/">（一）架构总览与领域分域</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/">（二）折扣试算与规则编排</a></li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%89-%E5%BA%93%E5%AD%98%E4%B8%80%E8%87%B4%E6%80%A7%E4%B8%8E%E5%B9%82%E7%AD%89/">（三）库存一致性与幂等</a>（本篇）</li>
+<li><a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/">（四）结算回调与退款逆向</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+              <a href="/tags/%E9%AB%98%E5%B9%B6%E5%8F%91/" rel="tag"># 高并发</a>
+              <a href="/tags/DDD/" rel="tag"># DDD</a>
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%BA%8C-%E6%8A%98%E6%89%A3%E8%AF%95%E7%AE%97%E4%B8%8E%E8%A7%84%E5%88%99%E7%BC%96%E6%8E%92/" rel="prev" title="高并发拼团交易系统拆解（二）：折扣试算与规则编排">
+                  <i class="fa fa-angle-left"></i> 高并发拼团交易系统拆解（二）：折扣试算与规则编排
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E5%9B%9B-%E7%BB%93%E7%AE%97%E5%9B%9E%E8%B0%83%E4%B8%8E%E9%80%80%E6%AC%BE%E9%80%86%E5%90%91/" rel="next" title="高并发拼团交易系统拆解（四）：结算回调与退款逆向">
+                  高并发拼团交易系统拆解（四）：结算回调与退款逆向 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

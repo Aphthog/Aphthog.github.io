@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="系列第 3 篇：SQLite 工作记忆、ChromaDB 语义记忆、LLM 抽取的用户画像——三层各管什么、怎么组装进上下文、节流设计，以及 ChromaDB 替代 FAISS 的选型逻辑">
+<meta property="og:type" content="article">
+<meta property="og:title" content="QQ 群 AI 助手开发记录（三）：三层记忆系统">
+<meta property="og:url" content="https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%89-%E4%B8%89%E5%B1%82%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="系列第 3 篇：SQLite 工作记忆、ChromaDB 语义记忆、LLM 抽取的用户画像——三层各管什么、怎么组装进上下文、节流设计，以及 ChromaDB 替代 FAISS 的选型逻辑">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-29T15:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-01T06:01:48.937Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Agent">
+<meta property="article:tag" content="NoneBot2">
+<meta property="article:tag" content="Python">
+<meta property="article:tag" content="项目">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%89-%E4%B8%89%E5%B1%82%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%89-%E4%B8%89%E5%B1%82%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F/","path":"2026/08/29/QQ群AI助手开发记录-三-三层记忆系统/","title":"QQ 群 AI 助手开发记录（三）：三层记忆系统"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>QQ 群 AI 助手开发记录（三）：三层记忆系统 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li><li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%89-%E4%B8%89%E5%B1%82%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="QQ 群 AI 助手开发记录（三）：三层记忆系统 | Camille">
+      <meta itemprop="description" content="系列第 3 篇：SQLite 工作记忆、ChromaDB 语义记忆、LLM 抽取的用户画像——三层各管什么、怎么组装进上下文、节流设计，以及 ChromaDB 替代 FAISS 的选型逻辑">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          QQ 群 AI 助手开发记录（三）：三层记忆系统
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-29 15:00:00" itemprop="dateCreated datePublished" datetime="2026-08-29T15:00:00+00:00">2026-08-29</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-01 06:01:48" itemprop="dateModified" datetime="2026-09-01T06:01:48+00:00">2026-09-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">系列第 3 篇：SQLite 工作记忆、ChromaDB 语义记忆、LLM 抽取的用户画像——三层各管什么、怎么组装进上下文、节流设计，以及 ChromaDB 替代 FAISS 的选型逻辑</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>群聊助手的灵魂在于”记得住”。用户昨天说过养了只猫，今天问”我家那只吃什么”，答不上来就露馅了。这个项目的记忆分三层，各管一件事：<strong>工作记忆</strong>管这个会话刚才说了什么，<strong>语义记忆</strong>管这个群历史上值得记住的事实，<strong>用户画像</strong>管每个群友是谁。这一篇拆这三层怎么落地、怎么组装进上下文、以及为什么是三层而不是一个向量库全解决。</p>
+<blockquote>
+<p>系列目录见<a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/">第一篇</a>。</p>
+</blockquote>
+<h2 id="三层总览"><a href="#三层总览" class="headerlink" title="三层总览"></a>三层总览</h2><table>
+<thead>
+<tr>
+<th>层</th>
+<th>存储</th>
+<th>粒度</th>
+<th>写入时机</th>
+<th>读取时机</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>工作记忆</td>
+<td>SQLite <code>sessions</code> 表</td>
+<td>单条消息</td>
+<td>每条消息实时写入</td>
+<td>触发时拉最近 30 条</td>
+</tr>
+<tr>
+<td>语义记忆</td>
+<td>ChromaDB <code>agent_memory</code> 集合</td>
+<td>事实（一句话）</td>
+<td>对话结束后 LLM 抽取</td>
+<td>触发时按语义召回 top5</td>
+</tr>
+<tr>
+<td>用户画像</td>
+<td>SQLite <code>profiles</code> 表</td>
+<td>每用户一份 traits JSON</td>
+<td>每 50 次互动 LLM 抽取一次</td>
+<td>按需查询</td>
+</tr>
+</tbody></table>
+<p>三个 MemoryManager 之下的组件共享一个 SQLite 文件，<code>MemoryManager</code> 做统一门面。为什么是三层：<strong>时间粒度不同</strong>——秒级（刚才）、周级（这个群聊过什么）、长期（这个人是谁）；<strong>读取方式也不同</strong>——顺序窗口、语义相似、按人索引。一个向量库装所有东西，召回时群聊闲话和关键事实混在一起，反而稀释了精度。</p>
+<h2 id="工作记忆：倒序取再反转"><a href="#工作记忆：倒序取再反转" class="headerlink" title="工作记忆：倒序取再反转"></a>工作记忆：倒序取再反转</h2><p>SQLite 存每个会话的原始消息，建表时索引直接按查询模式建：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/memory/store.py（节选）</span></span><br><span class="line">CREATE TABLE IF NOT EXISTS sessions (</span><br><span class="line">    <span class="built_in">id</span> INTEGER PRIMARY KEY AUTOINCREMENT,</span><br><span class="line">    chat_key TEXT NOT NULL,</span><br><span class="line">    role TEXT NOT NULL,</span><br><span class="line">    content TEXT NOT NULL,</span><br><span class="line">    user_id TEXT NOT NULL DEFAULT <span class="string">&#x27;&#x27;</span>,</span><br><span class="line">    timestamp INTEGER NOT NULL DEFAULT <span class="number">0</span></span><br><span class="line">);</span><br><span class="line">CREATE INDEX IF NOT EXISTS idx_sessions_key_ts ON sessions(chat_key, timestamp DESC);</span><br></pre></td></tr></table></figure>
+
+<p>取上下文是个值得说的小技巧——<strong>倒序取再反转</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/memory/store.py</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">get_messages</span>(<span class="params">self, chat_key: <span class="built_in">str</span>, limit: <span class="built_in">int</span> = <span class="number">30</span></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">dict</span>]:</span><br><span class="line">    cursor = <span class="keyword">await</span> <span class="variable language_">self</span>._db.execute(</span><br><span class="line">        <span class="string">&quot;SELECT role, content, user_id, timestamp FROM sessions &quot;</span></span><br><span class="line">        <span class="string">&quot;WHERE chat_key = ? ORDER BY timestamp DESC, id DESC LIMIT ?&quot;</span>,</span><br><span class="line">        (chat_key, limit),</span><br><span class="line">    )</span><br><span class="line">    rows = <span class="keyword">await</span> cursor.fetchall()</span><br><span class="line">    msgs = [<span class="built_in">dict</span>(r) <span class="keyword">for</span> r <span class="keyword">in</span> <span class="built_in">reversed</span>(rows)]</span><br><span class="line">    <span class="keyword">return</span> msgs</span><br></pre></td></tr></table></figure>
+
+<p><code>ORDER BY timestamp DESC ... LIMIT 30</code> 走 <code>(chat_key, timestamp DESC)</code> 索引，直接拿到”最近的 30 条”；如果写升序 <code>ORDER BY timestamp ASC LIMIT 30</code> 拿到的是<strong>最早的</strong> 30 条，要最近的就得排序全表。倒序索引 + 应用层 <code>reversed()</code> 恢复时间顺序，一行 Python 省一个排序需求。<code>id DESC</code> 做次级排序是处理同一秒多条消息的稳定性。</p>
+<p>工作记忆解决的是<strong>指代和话题延续</strong>：”他呢？””那第二个呢？”——没有前文这些问句无法回答。群聊拉 30 条、私聊 15 条注入 prompt，够模型理解话题，又不至于撑爆上下文。</p>
+<h2 id="语义记忆：ChromaDB-chat-key-过滤"><a href="#语义记忆：ChromaDB-chat-key-过滤" class="headerlink" title="语义记忆：ChromaDB + chat_key 过滤"></a>语义记忆：ChromaDB + chat_key 过滤</h2><p>语义记忆存的是 LLM 从对话里抽出来的<strong>事实</strong>（”小王下周要去成都出差”），用 ChromaDB 持久化：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/memory/vector.py（节选）</span></span><br><span class="line"><span class="variable language_">self</span>._client = chromadb.PersistentClient(</span><br><span class="line">    path=<span class="variable language_">self</span>.path,</span><br><span class="line">    settings=ChromaSettings(anonymized_telemetry=<span class="literal">False</span>),</span><br><span class="line">)</span><br><span class="line"><span class="variable language_">self</span>._collection = <span class="variable language_">self</span>._client.get_or_create_collection(<span class="string">&quot;agent_memory&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">recall</span>(<span class="params">self, query: <span class="built_in">str</span>, chat_key: <span class="built_in">str</span> = <span class="string">&quot;&quot;</span>, k: <span class="built_in">int</span> = <span class="number">5</span></span>) -&gt; <span class="built_in">list</span>[<span class="built_in">str</span>]:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Retrieve relevant memories by semantic similarity.&quot;&quot;&quot;</span></span><br><span class="line">    <span class="variable language_">self</span>._ensure_init()</span><br><span class="line">    where = &#123;<span class="string">&quot;chat_key&quot;</span>: chat_key&#125; <span class="keyword">if</span> chat_key <span class="keyword">else</span> <span class="literal">None</span></span><br><span class="line">    results = <span class="variable language_">self</span>._collection.query(</span><br><span class="line">        query_texts=[query],</span><br><span class="line">        n_results=k,</span><br><span class="line">        where=where,</span><br><span class="line">    )</span><br><span class="line">    docs = results.get(<span class="string">&quot;documents&quot;</span>, [[]])[<span class="number">0</span>]</span><br><span class="line">    <span class="keyword">return</span> [d <span class="keyword">for</span> d <span class="keyword">in</span> docs <span class="keyword">if</span> d]</span><br></pre></td></tr></table></figure>
+
+<p>写入时每条事实的 metadata 都带 <code>chat_key</code>，召回时 <code>where={&quot;chat_key&quot;: chat_key}</code> 过滤——<strong>A 群的记忆不会召回给 B 群</strong>。语义相似没有群隔离的话，不同群的”搬家””点外卖”互相污染，这是多群部署的第一个坑。</p>
+<h3 id="为什么是-ChromaDB-不是-FAISS"><a href="#为什么是-ChromaDB-不是-FAISS" class="headerlink" title="为什么是 ChromaDB 不是 FAISS"></a>为什么是 ChromaDB 不是 FAISS</h3><p>V1 的知识库用的是 bge-large-zh + FAISS HNSW，效果不错但要自己管三件事：embedding 模型加载（一个 GPU&#x2F;CPU 推理进程）、索引持久化（增删后重建&#x2F;落盘）、分块器。这套重量在 RAG 服务场景值得——那个场景有上万文档（搭建过程写过<a href="/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E4%B8%80-%E4%BB%8E%E9%9B%B6%E5%BC%80%E5%A7%8B/">一个系列</a>）。</p>
+<p>而群聊语义记忆的量级是<strong>一个群几千条事实</strong>，ChromaDB 内置默认 embedding 开箱即用、PersistentClient 自动持久化、增删原生支持。<strong>方案重量要匹配数据量级</strong>——这个道理在 RAG 项目里悟过，这里又验证了一遍。如果哪天要跨几百个群，再考虑换回 FAISS + 独立 embedding 服务。</p>
+<h2 id="事实抽取：NONE-哨兵"><a href="#事实抽取：NONE-哨兵" class="headerlink" title="事实抽取：NONE 哨兵"></a>事实抽取：NONE 哨兵</h2><p>把事实<strong>写入</strong>语义记忆的环节在每轮对话结束后台跑：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/memory/manager.py — extract_and_remember（节选）</span></span><br><span class="line">dialogs = <span class="string">&quot;\n&quot;</span>.join(</span><br><span class="line">    <span class="string">f&quot;<span class="subst">&#123;m[<span class="string">&#x27;role&#x27;</span>]&#125;</span>: <span class="subst">&#123;m[<span class="string">&#x27;content&#x27;</span>][:<span class="number">300</span>]&#125;</span>&quot;</span> <span class="keyword">for</span> m <span class="keyword">in</span> messages[-<span class="number">6</span>:]</span><br><span class="line">)</span><br><span class="line">msgs = build_messages(</span><br><span class="line">    system_prompt=<span class="string">&quot;从对话中提取值得记住的事实（人物信息、约定、偏好等）。每行一个事实。没有就输出 NONE。&quot;</span>,</span><br><span class="line">    user_text=dialogs,</span><br><span class="line">)</span><br><span class="line">raw = <span class="keyword">await</span> <span class="variable language_">self</span>.profiles.llm.chat(msgs, max_tokens=<span class="number">200</span>, temperature=<span class="number">0.1</span>)</span><br><span class="line"><span class="keyword">if</span> raw.strip().upper() == <span class="string">&quot;NONE&quot;</span>:</span><br><span class="line">    <span class="keyword">return</span></span><br><span class="line">facts = [line.strip(<span class="string">&quot;- &quot;</span>).strip() <span class="keyword">for</span> line <span class="keyword">in</span> raw.split(<span class="string">&quot;\n&quot;</span>) <span class="keyword">if</span> line.strip() <span class="keyword">and</span> <span class="string">&quot;NONE&quot;</span> <span class="keyword">not</span> <span class="keyword">in</span> line]</span><br><span class="line"><span class="keyword">if</span> facts:</span><br><span class="line">    <span class="keyword">await</span> <span class="variable language_">self</span>.remember(chat_key, facts)</span><br></pre></td></tr></table></figure>
+
+<p>三个设计点：</p>
+<ol>
+<li><strong>只看最近 6 条</strong>。抽取的对象是”这一轮对话里新产生的信息”，窗口大了模型会把旧事实重复抽取，语义记忆里全是重复条目；</li>
+<li><strong>NONE 哨兵</strong>。闲聊占大多数（”哈哈哈””6”），要求模型”没有事实就输出 NONE”，避免硬抽——把”无事发生”变成一个可判断的显式信号，而不是让模型硬编；</li>
+<li><strong>temperature 0.1 + max_tokens 200</strong>。抽取是结构化任务不是创作，低温保稳定，200 token 封顶防跑飞。</li>
+</ol>
+<p>这个抽取调用发生在回复已发出之后（<code>chat.py</code> 里 <code>memory.save</code> 之后），<strong>不在用户等待路径上</strong>——抽得慢一点也不影响体验。</p>
+<h2 id="用户画像：50-次的节流"><a href="#用户画像：50-次的节流" class="headerlink" title="用户画像：50 次的节流"></a>用户画像：50 次的节流</h2><p>画像比事实更进一步：每个用户一份结构化 traits（兴趣、所在地、职业、偏好），存 SQLite <code>profiles</code> 表的 JSON 字段。抽取用另一个 prompt，输出 JSON：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/memory/profile.py（节选）</span></span><br><span class="line">PROFILE_EXTRACT_PROMPT = <span class="string">&quot;&quot;&quot;从对话中提取用户的特征标签。输出 JSON：&#123;&quot;traits&quot;: &#123;&quot;key&quot;: &quot;value&quot;, ...&#125;&#125;</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">可提取的信息类型：</span></span><br><span class="line"><span class="string">- interests: 兴趣爱好</span></span><br><span class="line"><span class="string">- location: 所在地</span></span><br><span class="line"><span class="string">- occupation: 职业/专业</span></span><br><span class="line"><span class="string">- preferences: 偏好</span></span><br><span class="line"><span class="string">- pets: 宠物</span></span><br><span class="line"><span class="string">- other: 其他值得记录的信息</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">只输出 JSON。如果没有新发现，输出空的 traits。&quot;&quot;&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>关键在节流——<strong>每 50 条消息才真正触发一次抽取</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/memory/profile.py（节选）</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">def</span> <span class="title function_">update_profile</span>(<span class="params">self, user_id, nickname, messages, force=<span class="literal">False</span></span>):</span><br><span class="line">    <span class="variable language_">self</span>._update_counters[user_id] = <span class="variable language_">self</span>._update_counters.get(user_id, <span class="number">0</span>) + <span class="number">1</span></span><br><span class="line">    <span class="keyword">if</span> <span class="keyword">not</span> force <span class="keyword">and</span> <span class="variable language_">self</span>._update_counters[user_id] &lt; <span class="number">50</span>:</span><br><span class="line">        <span class="keyword">return</span>          <span class="comment"># 计数没到，直接跳过——一次 LLM 调用都不花</span></span><br><span class="line">    <span class="variable language_">self</span>._update_counters[user_id] = <span class="number">0</span></span><br><span class="line">    dialogs_text = <span class="string">&quot;\n&quot;</span>.join(</span><br><span class="line">        <span class="string">f&quot;<span class="subst">&#123;m[<span class="string">&#x27;role&#x27;</span>]&#125;</span>: <span class="subst">&#123;m[<span class="string">&#x27;content&#x27;</span>][:<span class="number">200</span>]&#125;</span>&quot;</span> <span class="keyword">for</span> m <span class="keyword">in</span> messages[-<span class="number">20</span>:]</span><br><span class="line">    )</span><br><span class="line">    raw = <span class="keyword">await</span> <span class="variable language_">self</span>.llm.chat(msgs, max_tokens=<span class="number">200</span>, temperature=<span class="number">0.1</span>)</span><br><span class="line">    ...</span><br><span class="line">    <span class="keyword">if</span> traits:</span><br><span class="line">        <span class="keyword">await</span> <span class="variable language_">self</span>.store.upsert_profile(user_id, nickname, traits)</span><br></pre></td></tr></table></figure>
+
+<p>不节流的后果可以直接算账：活跃群友一天说 200 句，每句跑一次抽取 LLM，一个月 6000 次调用——<strong>画像抽取的成本会超过聊天本身</strong>。50 次的窗口攒够 20 条最近的对话再抽，信息密度高、调用次数降两个数量级。<code>upsert_profile</code> 做 traits 合并（新 traits update 进旧 dict），画像只增不减——这是个已知取舍，噪声标签会累积，清理留给以后的管理命令。</p>
+<h2 id="组装：三层怎么进一次回答"><a href="#组装：三层怎么进一次回答" class="headerlink" title="组装：三层怎么进一次回答"></a>组装：三层怎么进一次回答</h2><p><code>chat.py</code> 里一次触发回答前的组装：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># qq_bot/plugins/chat.py（节选）</span></span><br><span class="line">ctx_msgs = <span class="keyword">await</span> memory.get_context(chat_key, limit=<span class="number">30</span>)      <span class="comment"># 工作记忆</span></span><br><span class="line">ctx_text = _format_context(ctx_msgs)</span><br><span class="line"></span><br><span class="line">mem_text = <span class="keyword">await</span> memory.recall(text, chat_key)               <span class="comment"># 语义记忆（带群过滤）</span></span><br><span class="line"></span><br><span class="line">combined_context = ctx_text</span><br><span class="line"><span class="keyword">if</span> mem_text:</span><br><span class="line">    combined_context += <span class="string">f&quot;\n[相关记忆]\n<span class="subst">&#123;mem_text&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line">response = <span class="keyword">await</span> agent.run(</span><br><span class="line">    text,</span><br><span class="line">    image_urls=image_urls <span class="keyword">if</span> image_urls <span class="keyword">else</span> <span class="literal">None</span>,</span><br><span class="line">    memory_context=combined_context,</span><br><span class="line">    user_id=user_id,</span><br><span class="line">    group_id=group_id,</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>回答之后回写：<code>memory.save</code> 存双方消息 → <code>update_profile</code>（计数节流）→ <code>extract_and_remember</code>（后台抽事实）。一轮对话完成”读三层 → 回答 → 写三层”的闭环。</p>
+<p>上下文的经济学是这套设计的隐含主线：<strong>30 条窗口 + 5 条召回 + 画像</strong>，一次回答的上下文成本是可预算的常数；不设记忆的方案要么答非所问，要么把全部历史塞进 prompt——后者 token 成本随时间线性增长，很快就不可持续。</p>
+<h2 id="待办与展望"><a href="#待办与展望" class="headerlink" title="待办与展望"></a>待办与展望</h2><p>下一步想让画像系统接入回复风格——对不同熟悉度的群友用不同的语气说话（画像里有 <code>interaction_count</code> 和兴趣标签，素材是现成的）。另一个想做的方向是遗忘机制：语义记忆按时间衰减权重，或对低频召回的记忆做定期归档。做了再记录。</p>
+<h2 id="面试追问预演"><a href="#面试追问预演" class="headerlink" title="面试追问预演"></a>面试追问预演</h2><p><strong>Q: 为什么三层而不是一个向量库全解决？</strong><br>A: 时间粒度（秒&#x2F;周&#x2F;长期）和读取方式（顺序窗口&#x2F;语义相似&#x2F;按人索引）都不同。全塞一个向量库，闲聊和事实混召，精度稀释；且”最近 30 条”这种查询用向量库反而是绕路。</p>
+<p><strong>Q: 多群记忆怎么隔离？</strong><br>A: 每条记忆的 metadata 带 chat_key，召回时 where 过滤。粒度是群级——同群用户共享语义记忆，这是刻意设计（群聊本来就是公共语境）；用户画像才是按 user_id 隔离的。</p>
+<p><strong>Q: 记忆抽取会出错（抽了无关信息&#x2F;漏抽）怎么办？</strong><br>A: 抽取用低温 + 明确的 NONE 哨兵降低硬编；存储是增删接口齐全的 ChromaDB，管理命令可以删。已知取舍是 traits 只增不减，清理机制在待办里。更系统的做法是给记忆加置信度和召回反馈（被引用过的记忆加权），列入计划。</p>
+<p><strong>Q: 工作记忆为什么 SQLite 不用 Redis？</strong><br>A: 查询模式是”按会话取最近 N 条”，SQLite 一个复合索引完美覆盖，且要持久化；Redis 做这个还得自己处理持久化和分页。单机部署下 SQLite 是零运维的最优解。</p>
+<hr>
+<p>系列目录：</p>
+<ul>
+<li><a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%80-Agent%E6%9E%B6%E6%9E%84%E4%B8%8E%E5%B7%A5%E5%85%B7%E6%A1%86%E6%9E%B6/">（一）Agent 架构与工具框架</a></li>
+<li><a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E4%B8%89%E5%B1%82%E5%AE%89%E5%85%A8%E9%98%B2%E5%BE%A1/">（二）三层安全防御</a></li>
+<li><a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%B8%89-%E4%B8%89%E5%B1%82%E8%AE%B0%E5%BF%86%E7%B3%BB%E7%BB%9F/">（三）三层记忆系统</a>（本篇）</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Python/" rel="tag"># Python</a>
+              <a href="/tags/Agent/" rel="tag"># Agent</a>
+              <a href="/tags/NoneBot2/" rel="tag"># NoneBot2</a>
+              <a href="/tags/%E9%A1%B9%E7%9B%AE/" rel="tag"># 项目</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/29/QQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B%E5%BC%80%E5%8F%91%E8%AE%B0%E5%BD%95-%E4%BA%8C-%E4%B8%89%E5%B1%82%E5%AE%89%E5%85%A8%E9%98%B2%E5%BE%A1/" rel="prev" title="QQ 群 AI 助手开发记录（二）：三层安全防御">
+                  <i class="fa fa-angle-left"></i> QQ 群 AI 助手开发记录（二）：三层安全防御
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/09/01/%E9%9D%A2%E7%BB%8F-%E5%8F%AA%E7%9C%8B%E7%AE%80%E5%8E%86%E7%9A%84%E6%A8%A1%E6%8B%9F%E4%B8%80%E9%9D%A2%E5%A4%8D%E7%9B%98-%E6%8B%BC%E5%9B%A2%E4%B8%8EQQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B/" rel="next" title="面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手）">
+                  面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手） <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

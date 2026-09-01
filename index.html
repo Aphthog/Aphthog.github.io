@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camille</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f1ea;
+  color: #3a3028;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+.container {
+  width: 100%;
+  max-width: 780px;
+  padding: 0 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0 48px;
+}
+.site-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #d4783e;
+  text-decoration: none;
+  letter-spacing: 1.5px;
+}
+.header-nav { display: flex; gap: 20px; }
+.header-nav a {
+  font-size: 13px;
+  color: #9a8a78;
+  text-decoration: none;
+  transition: color 200ms;
+}
+.header-nav a:hover { color: #d4783e; }
+
+/* Hero */
+.hero {
+  text-align: center;
+  margin-bottom: 44px;
+  padding: 40px 0 32px;
+  border-bottom: 1px solid #e0d6c6;
+}
+.hero-title {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 24px;
+  font-weight: 400;
+  color: #3a3028;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+.hero-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b0a090;
+  letter-spacing: 0.3px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+.tab {
+  font-size: 13px;
+  color: #9a8a78;
+  background: none;
+  border: none;
+  padding: 0 0 4px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 200ms;
+}
+.tab:hover { color: #d4783e; }
+.tab.active { color: #d4783e; font-weight: 500; border-bottom: 1.5px solid #d4783e; }
+
+/* Article list */
+.section-content { display: none; }
+.section-content.active { display: block; }
+
+.article-item {
+  display: block;
+  padding: 20px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #e0d6c6;
+}
+.article-item:last-child { border-bottom: none; }
+.article-date {
+  font-size: 12px;
+  color: #b0a090;
+  margin-bottom: 3px;
+  letter-spacing: 0.3px;
+}
+.article-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-bottom: 3px;
+  transition: color 200ms;
+}
+.article-item:hover .article-title { color: #d4783e; }
+.article-excerpt {
+  font-size: 13px;
+  color: #9a8a78;
+  line-height: 1.5;
+}
+
+.empty-state {
+  padding: 40px 0;
+  color: #b0a090;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 48px 0 24px;
+  font-size: 12px;
+  color: #c0b8a8;
+}
+
+@media (max-width: 600px) {
+  .header { padding: 14px 0 28px; }
+  .hero { padding: 24px 0 20px; }
+  .hero-title { font-size: 20px; }
+  .tabs { gap: 16px; }
+  .article-item { padding: 16px 0; }
+}
+
+/* Interaction effects */
+html { scroll-behavior: smooth; }
+
+.header-nav a {
+  position: relative;
+  transition: color 200ms ease;
+}
+.header-nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #d4783e;
+  transition: width 250ms ease;
+}
+.header-nav a:hover::after {
+  width: 100%;
+}
+
+.article-item {
+  transition: all 250ms ease;
+}
+.article-item:hover {
+  padding-left: 8px;
+}
+.article-title { transition: color 200ms ease; }
+
+.tab { transition: all 250ms ease; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <header class="header">
+    <a href="/" class="site-name">Camille</a>
+    <nav class="header-nav">
+      <a href="/">首页</a>
+      <a href="/archives/">归档</a>
+      <a href="/about/">关于</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div class="hero-title">写代码，按快门，偶尔写点东西</div>
+    <div class="hero-sub">技术笔记 · 摄影 · 随笔</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-section="tech">技术笔记</button>
+    <button class="tab" data-section="photo">摄影</button>
+    <button class="tab" data-section="essay">随笔</button>
+  </div>
+
+  
+  <div class="section-content active" id="tech">
+    
+    <a class="article-item" href="/2026/09/01/面经-只看简历的模拟一面复盘-拼团与QQ群AI助手/">
+      <div class="article-date">Sep 01</div>
+      <div class="article-title">面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手）</div>
+      <div class="article-excerpt">只拿到简历的 AI 面试官 vs 以真实代码作答的候选人：11 道题完整复盘——条件更新两层保证、记账式库存恢复、SSRF 两个真洞当场认领，以及简历上那些经不起对账的数字</div>
+    </a>
+    
+    <a class="article-item" href="/2026/08/29/QQ群AI助手开发记录-三-三层记忆系统/">
+      <div class="article-date">Aug 29</div>
+      <div class="article-title">QQ 群 AI 助手开发记录（三）：三层记忆系统</div>
+      <div class="article-excerpt">系列第 3 篇：SQLite 工作记忆、ChromaDB 语义记忆、LLM 抽取的用户画像——三层各管什么、怎么组装进上下文、节流设计，以及 ChromaDB 替代 FAISS 的选型逻辑</div>
+    </a>
+    
+    <a class="article-item" href="/2026/08/29/QQ群AI助手开发记录-二-三层安全防御/">
+      <div class="article-date">Aug 29</div>
+      <div class="article-title">QQ 群 AI 助手开发记录（二）：三层安全防御</div>
+      <div class="article-excerpt">系列第 2 篇：13 条注入正则的前置拦截、System Prompt 加固、SSRF 的 DNS 解析校验、run_code 沙箱四层防御，以及每层防御的诚实边界</div>
+    </a>
+    
+    <a class="article-item" href="/2026/08/29/QQ群AI助手开发记录-一-Agent架构与工具框架/">
+      <div class="article-date">Aug 29</div>
+      <div class="article-title">QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架</div>
+      <div class="article-excerpt">系列第 1 篇：从脚本式 V1 到 Agent V2 的重构——单循环替代五阶段设计、@tool 注册框架、并行执行器、LLM 网关与搜索降级</div>
+    </a>
+    
+    <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-四-结算回调与退款逆向/">
+      <div class="article-date">Aug 29</div>
+      <div class="article-title">高并发拼团交易系统拆解（四）：结算回调与退款逆向</div>
+      <div class="article-excerpt">系列第 4 篇：结算的三连条件更新、事务性发件箱保证回调必达、定时补偿与 Redisson 抢占、退款状态机的枚举路由、「团失败」到底由谁判定的状态机不闭环，以及整个系列的设计观总结</div>
+    </a>
+    
+    <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-三-库存一致性与幂等/">
+      <div class="article-date">Aug 29</div>
+      <div class="article-title">高并发拼团交易系统拆解（三）：库存一致性与幂等</div>
+      <div class="article-excerpt">系列第 3 篇：防超卖三层防线（INCR 快拒、恢复量记账、SET NX 兜底、条件更新封盘）、责任链锁单校验、四处幂等的四种打法，以及一个真实的时间单位 bug</div>
+    </a>
+    
+    <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-二-折扣试算与规则编排/">
+      <div class="article-date">Aug 29</div>
+      <div class="article-title">高并发拼团交易系统拆解（二）：折扣试算与规则编排</div>
+      <div class="article-excerpt">系列第 2 篇：试算接口的规则树编排、DCC 动态开关、策略模式的 Map 注入路由、模板方法收敛公共逻辑，以及 500ms 到 200ms 的并行化推导</div>
+    </a>
+    
+    <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-一-架构总览与领域分域/">
+      <div class="article-date">Aug 29</div>
+      <div class="article-title">高并发拼团交易系统拆解（一）：架构总览与领域分域</div>
+      <div class="article-excerpt">系列第 1 篇：拼团营销系统的边界划分、DDD 四层 + 三域的落地方式、10 张表的归属，以及人群标签 Bitmap 方案的内存账本与 MD5 取模的坑</div>
+    </a>
+    
+    <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-四-踩坑记/">
+      <div class="article-date">May 15</div>
+      <div class="article-title">RAG 服务搭建记录（四）：踩坑记</div>
+      <div class="article-excerpt">七个 bug 的排查过程，从 segfault 到分数越界</div>
+    </a>
+    
+    <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-三-检索与精排/">
+      <div class="article-date">May 15</div>
+      <div class="article-title">RAG 服务搭建记录（三）：检索与精排</div>
+      <div class="article-excerpt">混合检索分数融合、cross-encoder reranker、FP16 推理</div>
+    </a>
+    
+    <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-二-嵌入与索引/">
+      <div class="article-date">May 15</div>
+      <div class="article-title">RAG 服务搭建记录（二）：嵌入与索引</div>
+      <div class="article-excerpt">bge-m3 双通道编码、FAISS HNSW 构建、多租户持久化</div>
+    </a>
+    
+    <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-一-从零开始/">
+      <div class="article-date">May 15</div>
+      <div class="article-title">RAG 服务搭建记录（一）：从零开始</div>
+      <div class="article-excerpt">技术选型、架构设计、FAISS vs 其他索引方案</div>
+    </a>
+    
+    <a class="article-item" href="/2026/05/09/Java-泛型入门/">
+      <div class="article-date">May 09</div>
+      <div class="article-title">Java 泛型入门</div>
+      <div class="article-excerpt">类型擦除、泛型类与方法，一篇搞懂</div>
+    </a>
+    
+    
+  </div>
+  
+  <div class="section-content" id="photo">
+    
+    <a class="article-item" href="/2026/05/09/街角/">
+      <div class="article-date">May 09</div>
+      <div class="article-title">街角</div>
+      <div class="article-excerpt">35mm 焦段的日常练习</div>
+    </a>
+    
+    
+  </div>
+  
+  <div class="section-content" id="essay">
+    
+    <a class="article-item" href="/2026/05/09/五月记/">
+      <div class="article-date">May 09</div>
+      <div class="article-title">五月记</div>
+      <div class="article-excerpt">读书、摄影、以及最近做的事</div>
+    </a>
+    
+    <a class="article-item" href="/2026/05/08/我的第一篇文章/">
+      <div class="article-date">May 08</div>
+      <div class="article-title">我的第一篇文章</div>
+      <div class="article-excerpt">用 Markdown 写文章，保持简单</div>
+    </a>
+    
+    
+  </div>
+  
+
+  <div class="footer">© 2026 Camille</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+    document.getElementById(tab.dataset.section).classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>

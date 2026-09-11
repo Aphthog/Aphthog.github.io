@@ -74,6 +74,8 @@ public class MapGrowth {
 }
 ```
 
+这里有个我自己先踩到的坑：JDK 9 之后 `java.util` 被模块化保护，直接 `setAccessible(true)` 会抛 `InaccessibleObjectException`，要运行时加参数 `--add-opens java.base/java.util=ALL-UNNAMED` 才能跑。（我本地是 JDK 17，第一次跑就报了这个错。）
+
 输出是：
 
 ```

@@ -1,0 +1,28 @@
+<%- include('partials/head', { pageTitle: collection.name + ' · Camille' }) %>
+<body>
+
+<div class="container">
+
+  <%- include('partials/header') %>
+
+  <a class="back-link" href="/collections/">← 全部合集</a>
+
+  <div class="collection-head">
+    <h1><%= collection.name %></h1>
+    <p><%= collection.description %>（共 <%= collection.count %> 篇）</p>
+  </div>
+
+  <% collection.posts.forEach(function (p) { %>
+  <a class="article-item" href="<%= p.url %>">
+    <div class="article-date"><%= p.date %></div>
+    <div class="article-title"><%= p.title %></div>
+    <div class="article-excerpt"><%= p.excerpt %></div>
+  </a>
+  <% }); %>
+
+  <%- include('partials/footer') %>
+
+</div>
+
+</body>
+</html>

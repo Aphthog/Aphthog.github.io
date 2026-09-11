@@ -1,0 +1,33 @@
+<%- include('partials/head', { pageTitle: '合集 · Camille' }) %>
+<body>
+
+<div class="container">
+
+  <%- include('partials/header') %>
+
+  <div class="hero">
+    <div class="hero-title">合集</div>
+    <div class="hero-sub">按主题和项目整理的文章</div>
+  </div>
+
+  <% groups.forEach(function (g) { %>
+  <div class="collection-group">
+    <div class="group-title"><%= g.name %></div>
+    <div class="collection-grid">
+      <% g.collections.forEach(function (c) { %>
+      <a class="collection-card" href="/collections/<%= c.id %>/">
+        <div class="collection-name"><%= c.name %></div>
+        <div class="collection-desc"><%= c.description %></div>
+        <div class="collection-count"><%= c.count %> 篇</div>
+      </a>
+      <% }); %>
+    </div>
+  </div>
+  <% }); %>
+
+  <%- include('partials/footer') %>
+
+</div>
+
+</body>
+</html>

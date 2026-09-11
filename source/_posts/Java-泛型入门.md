@@ -1,6 +1,6 @@
 ---
 title: Java 泛型入门
-date: 2026-05-09
+date: 2025-04-26 10:00
 categories: [技术笔记]
 tags: [Java, 泛型]
 description: 类型擦除、泛型类与方法，一篇搞懂

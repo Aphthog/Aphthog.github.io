@@ -3,7 +3,7 @@ title: Agent 的基本循环：感知、决策、执行
 date: 2026-03-07 10:00
 categories: [技术笔记]
 tags: [LLM, Agent]
-description: ReAct循环的简化理解，终止条件与最大轮数，Agent与固定workflow的选择
+description: ReAct循环的简化，终止条件与最大轮数，Agent与固定workflow选择
 collection: llm-agent
 ---
 

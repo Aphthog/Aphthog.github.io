@@ -22,7 +22,7 @@ static final int hash(Object key) {
 
 `hashCode()` 返回一个 32 位的 int，而下面定位时只用得到低位。如果不处理，高 16 位的信息就白白浪费了——两个高位不同、低位相同的 key 会算到同一个位置去。这里把高 16 位异或到低 16 位上，让高位也参与进来，撞车的概率就小很多。
 
-**第二步是定位到桶。** 下标算的是 `(n - 1) & hash`，n 是数组容量。因为 n 是 2 的幂，这个按位与等价于 `hash % n`，但位运算快得多。这也解释了为什么 HashMap 的容量必须是 2 的幂——容量一旦不是 2 的幂，`(n-1) & hash` 和取模就不等价了，分布会出问题。
+**第二步是定位到桶。** 下标算的是 `(n - 1) & hash`，n 是数组容量。因为 n 是 2 的幂，对非负的 hash 这个按位与等价于取模；用按位与既能提速，也保证下标落在 `[0, n)` 范围内（`hashCode()` 可能是负数，取模会得到负下标）。这也解释了为什么 HashMap 的容量必须是 2 的幂——容量一旦不是 2 的幂，`(n-1) & hash` 和取模就不等价了，分布会出问题。
 
 **第三步才是放进去。** 桶是空的就直接放；桶里已经有东西，说明发生了哈希冲突，得想办法处理。
 
@@ -74,7 +74,7 @@ public class MapGrowth {
 }
 ```
 
-这里有个我自己先踩到的坑：JDK 9 之后 `java.util` 被模块化保护，直接 `setAccessible(true)` 会抛 `InaccessibleObjectException`，要运行时加参数 `--add-opens java.base/java.util=ALL-UNNAMED` 才能跑。（我本地是 JDK 17，第一次跑就报了这个错。）
+这里有个我自己先踩到的坑：JDK 16 起模块化默认禁止反射进入 `java.util`（JDK 9–15 只是告警），直接 `setAccessible(true)` 会抛 `InaccessibleObjectException`，要运行时加参数 `--add-opens java.base/java.util=ALL-UNNAMED` 才能跑。（我本地是 JDK 17，第一次跑就报了这个错。）
 
 输出是：
 

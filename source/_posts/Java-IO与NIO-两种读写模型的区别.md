@@ -13,7 +13,7 @@ collection: java-basics
 
 ## 最朴素的写法长什么样
 
-先看那段让我困惑的代码：
+先用最朴素的 `FileInputStream` 读文件感受一下：`int n = in.read(buf)` 会一直卡到数据就绪，这期间当前线程什么都干不了。同样的卡顿我在 Socket 上也遇到过，而且那次的感受更直接——先看那段让我困惑的代码：
 
 ```java
 try (ServerSocket server = new ServerSocket(8080)) {
@@ -42,7 +42,7 @@ while (true) {
 }
 ```
 
-这样确实能并发了，但线程是有成本的。每个线程默认要占几百 KB 到 1MB 的栈空间，一万个连接就是几 GB 内存；更亏的是，这些线程绝大多数时间都阻塞在 `read()` 上，什么也不干，只是在占着内存陪着连接等数据。连接数一上去，瓶颈不在 CPU，在内存和线程调度上。这就是当年 C10K 问题要解决的事情。
+这样确实能并发了，但线程是有成本的。每个线程默认要预留几百 KB 到 1MB 的栈空间，一万个线程就是几 GB 的栈空间预留——栈是按需提交的，一个阻塞在 `read()` 上的线程实际驻留的内存只有几 KB，真正吃掉的是地址空间；更亏的是，这些线程绝大多数时间都阻塞在 `read()` 上，什么也不干，只是在占着资源陪着连接等数据。连接数一上去，瓶颈不在 CPU，在内存和线程调度上。这就是当年 C10K 问题要解决的事情。
 
 ## NIO：Channel + Buffer + Selector
 
@@ -61,7 +61,10 @@ serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
 while (true) {
     selector.select();                                   // 阻塞，直到至少一个 Channel 就绪
-    for (SelectionKey key : selector.selectedKeys()) {
+    Iterator<SelectionKey> it = selector.selectedKeys().iterator();
+    while (it.hasNext()) {
+        SelectionKey key = it.next();
+        it.remove();                                     // 必须移除，否则下次 select 还会返回这个 key
         if (key.isAcceptable()) {
             SocketChannel client = serverChannel.accept();
             client.configureBlocking(false);
@@ -83,7 +86,7 @@ while (true) {
 | 阻塞行为 | accept / read 会阻塞 | 可设为非阻塞，交给 Selector 统一等 |
 | 线程模型 | 一连接一线程 | 一个线程管多个连接 |
 | 编程难度 | 直观，接近人的思维 | 复杂，要自己处理半包粘包和 Buffer 状态 |
-| 适用场景 | 连接数少、连接存活时间长 | 连接数多、单连接数据量小或活跃度低 |
+| 适用场景 | 连接数少且可控、请求-响应式 | 连接数多、单连接数据量小或活跃度低 |
 
 我的判断标准很简单：
 

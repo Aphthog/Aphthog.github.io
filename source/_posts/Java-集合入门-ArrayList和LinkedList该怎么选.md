@@ -57,7 +57,7 @@ System.out.printf("ArrayList: %d ms, LinkedList: %d ms%n",
         (t2 - t1) / 1_000_000, (t3 - t2) / 1_000_000);
 ```
 
-在我的机器上，`ArrayList` 那一段是个位数毫秒，`LinkedList` 要几秒。差别就在于第二段循环里的每次 `get(i)` 都是一次 O(n) 的链表遍历，整个循环被放大成了 O(n²)。
+在我的机器上，`ArrayList` 那一段是个位数毫秒，`LinkedList` 要几秒。差别就在于第二段循环里的每次 `get(i)` 都是一次 O(n) 的链表遍历，整个循环被放大成了 O(n²)。真要测性能得上 JMH，这里差距太大，朴素测法也够看。
 
 ## 为什么大多数场景还是选 ArrayList
 

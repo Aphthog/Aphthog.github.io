@@ -91,7 +91,7 @@ try (FileInputStream in = new FileInputStream("a.txt")) {
 }
 ```
 
-好处有三个：少写一大堆 finally 嵌套，读起来清爽；多个资源时按声明的反序关闭；如果 try 块和 `close()` 都抛了异常，`close()` 的异常会被标记成 suppressed 挂在主异常上，不会把真正的原因悄悄盖掉。凡是实现了 `AutoCloseable` 的资源——流、连接、锁——都值得用这个写法。
+好处有三个：少写一大堆 finally 嵌套，读起来清爽；多个资源时按声明的反序关闭；如果 try 块和 `close()` 都抛了异常，`close()` 的异常会被标记成 suppressed 挂在主异常上，不会把真正的原因悄悄盖掉。凡是实现了 `AutoCloseable` 的资源——流、连接，以及你自己实现了 `AutoCloseable` 的包装器——都值得用这个写法。（`ReentrantLock` 不实现 `AutoCloseable`，不是这里说的资源。）
 
 ## 三个反模式
 

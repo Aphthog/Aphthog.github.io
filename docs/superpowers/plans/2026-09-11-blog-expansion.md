@@ -283,7 +283,7 @@ main();
 Run: `node tools/verify-content.js`
 Expected: 11 行 `·` 标记，全部 `0 / N`，最后打印 `通过`
 
-- [ ] **Step 6: 给现有 16 篇补 `collection` 字段**
+- [ ] **Step 6: 给现有文章补 `collection` 字段（面经除外，共 15 篇）**
 
 在每篇 front-matter 的 `description` 行后加一行 `collection: <id>`：
 
@@ -309,13 +309,13 @@ Expected: 11 行 `·` 标记，全部 `0 / N`，最后打印 `通过`
 - [ ] **Step 7: 跑脚本校验回填结果**
 
 Run: `node tools/verify-content.js --all`
-Expected: `rag-service 4 / 4`、`qq-bot 3 / 3`、`group-buy 4 / 4`、`essay 3 / 3`、`photo 1 / 1` 打 `✓`；`java-basics 1 / 5`、`java-concurrency 0 / 6`、`jvm 0 / 4`、`mysql 0 / 7`、`redis 0 / 6`、`llm-agent 0 / 8` 打 `✗`（这些要等后续任务补）。脚本退出码 1 —— **这是预期的**，说明回填生效了且校验真的在起作用。
+Expected: `rag-service 4 / 4`、`qq-bot 3 / 3`、`group-buy 4 / 4`、`essay 2 / 2`、`photo 1 / 1` 打 `✓`；`java-basics 1 / 5`、`java-concurrency 0 / 6`、`jvm 0 / 4`、`mysql 0 / 7`、`redis 0 / 6`、`llm-agent 0 / 8` 打 `✗`（这些要等后续任务补）。脚本退出码 1 —— **这是预期的**，说明回填生效了且校验真的在起作用。
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add source/_data/collections.yml tools/ source/_posts/
-git commit -m "feat(collections): 合集数据源 + 内容校验脚本，现有 16 篇补 collection 归属"
+git commit -m "feat(collections): 合集数据源 + 内容校验脚本，现有 15 篇补 collection 归属"
 ```
 
 ---

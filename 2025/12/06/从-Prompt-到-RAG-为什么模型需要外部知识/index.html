@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="三种补知识方式的成本与适用面，RAG基本流程，什么时候它是过度设计">
+<meta property="og:type" content="article">
+<meta property="og:title" content="从 Prompt 到 RAG：为什么模型需要外部知识">
+<meta property="og:url" content="https://aphthog.github.io/2025/12/06/%E4%BB%8E-Prompt-%E5%88%B0-RAG-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%A8%A1%E5%9E%8B%E9%9C%80%E8%A6%81%E5%A4%96%E9%83%A8%E7%9F%A5%E8%AF%86/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="三种补知识方式的成本与适用面，RAG基本流程，什么时候它是过度设计">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-12-06T10:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.401Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="RAG">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/12/06/%E4%BB%8E-Prompt-%E5%88%B0-RAG-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%A8%A1%E5%9E%8B%E9%9C%80%E8%A6%81%E5%A4%96%E9%83%A8%E7%9F%A5%E8%AF%86/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/12/06/%E4%BB%8E-Prompt-%E5%88%B0-RAG-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%A8%A1%E5%9E%8B%E9%9C%80%E8%A6%81%E5%A4%96%E9%83%A8%E7%9F%A5%E8%AF%86/","path":"2025/12/06/从-Prompt-到-RAG-为什么模型需要外部知识/","title":"从 Prompt 到 RAG：为什么模型需要外部知识"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>从 Prompt 到 RAG：为什么模型需要外部知识 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/12/06/%E4%BB%8E-Prompt-%E5%88%B0-RAG-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%A8%A1%E5%9E%8B%E9%9C%80%E8%A6%81%E5%A4%96%E9%83%A8%E7%9F%A5%E8%AF%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="从 Prompt 到 RAG：为什么模型需要外部知识 | Camille">
+      <meta itemprop="description" content="三种补知识方式的成本与适用面，RAG基本流程，什么时候它是过度设计">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          从 Prompt 到 RAG：为什么模型需要外部知识
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-12-06 10:00:00" itemprop="dateCreated datePublished" datetime="2025-12-06T10:00:00+00:00">2025-12-06</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">三种补知识方式的成本与适用面，RAG基本流程，什么时候它是过度设计</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>有朋友第一次用 ChatGPT 问”今天天气怎么样”，模型回答说”我的知识截止到 2025 年”——他说不是，我是问今天天气。这个误会说明了一件事：模型知道的，是训练数据里截止某个时间点之前的内容。它不联网，不知道今天的新闻，不知道你公司内部的文档，也不知道你数据库里昨天新增的记录。</p>
+<p>想让模型”知道”它没学过的东西，有几种做法。我项目里都试过一轮，优缺点很明显。</p>
+<h2 id="三种补知识的方式"><a href="#三种补知识的方式" class="headerlink" title="三种补知识的方式"></a>三种补知识的方式</h2><h3 id="1-全部塞进-Prompt"><a href="#1-全部塞进-Prompt" class="headerlink" title="1. 全部塞进 Prompt"></a>1. 全部塞进 Prompt</h3><p>最简单直接：把你需要的知识写到 prompt 里。比如你要模型回答你家产品的售后政策，就把政策文档全文贴在 prompt 里。</p>
+<p>优点是没有架构变化，写一行 prompt 就行。缺点也很清楚：prompt 有 token 上限，知识一多就装不下。而且每次请求都把整份文档传一遍，成本按 token 算，频繁调用下来开销不小。适合知识量小、调用量低的场景——比如内部小工具，一次性问 5 道题。</p>
+<h3 id="2-微调"><a href="#2-微调" class="headerlink" title="2. 微调"></a>2. 微调</h3><p>把新知识直接训练进模型参数。优点是模型本身就会”记住”这些内容，不需要每次在 prompt 里贴。缺点是贵、慢、不灵活。知识一更新就得重新微调一遍。而且微调后的模型可能在其他方面出现退化（灾难性遗忘）。</p>
+<p>适合知识高度稳定且需要高频使用的场景——比如客服模型需要记住全套产品规格，而且规格一年才更新一次。但不适合今天改个参数明天加条政策的情况。</p>
+<h3 id="3-RAG（检索增强生成）"><a href="#3-RAG（检索增强生成）" class="headerlink" title="3. RAG（检索增强生成）"></a>3. RAG（检索增强生成）</h3><p>RAG 是这几种方式里最推荐的方案。它的思路不是让模型”记住”知识，而是帮模型在回答时”查到”知识。</p>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>成本</th>
+<th>更新难度</th>
+<th>适合场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>全塞进 Prompt</td>
+<td>低（部署），高（每次使用）</td>
+<td>容易（改文案）</td>
+<td>知识量小、低频使用</td>
+</tr>
+<tr>
+<td>微调</td>
+<td>高（训练），低（使用）</td>
+<td>难（需重新训练）</td>
+<td>知识稳定、高频使用</td>
+</tr>
+<tr>
+<td>RAG</td>
+<td>中（搭建），中（每次检索+生成）</td>
+<td>容易（重新索引）</td>
+<td>知识量大、频繁更新</td>
+</tr>
+</tbody></table>
+<h2 id="RAG-的基本流程"><a href="#RAG-的基本流程" class="headerlink" title="RAG 的基本流程"></a>RAG 的基本流程</h2><p>RAG 说穿了不复杂，几个步骤：</p>
+<ol>
+<li><strong>切块</strong>：把大文档切成小段。不能太长（语义混在一起），不能太短（缺乏上下文）。常见做法是 256–512 个 token 一段，带 overlap。</li>
+<li><strong>嵌入</strong>：把每个文本块用嵌入模型转成向量。</li>
+<li><strong>检索</strong>：用户提问时，把问题也转成向量，在向量库里找最相似的几段。</li>
+<li><strong>拼进上下文</strong>：把检索到的文本块塞进 prompt，让模型基于这些内容回答。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">用户提问 → 问题嵌入 → 向量检索（Top-K）→ 取到相关文本块</span><br><span class="line">                                               ↓</span><br><span class="line">用户提问 + 相关文本块 → 组装 Prompt → 模型生成回答</span><br></pre></td></tr></table></figure>
+
+<h2 id="什么情况下-RAG-反而是过度设计"><a href="#什么情况下-RAG-反而是过度设计" class="headerlink" title="什么情况下 RAG 反而是过度设计"></a>什么情况下 RAG 反而是过度设计</h2><p>RAG 虽好，但不是万能的。什么时候不该用？</p>
+<p><strong>知识量太小的时候。</strong> 如果你的知识库只有 10 条固定规则，写在 prompt 里就可以了。专门为 10 条规则搭一套向量检索、切块、索引体系，纯属给自己找麻烦。</p>
+<p><strong>内容不需要实时更新。</strong> 如果你的知识半年才变一次，微调的成本摊下来反而比每次检索 + 生成更便宜。微调之后模型调用时不需要检索步骤，响应更快。</p>
+<p><strong>查询模式高度固定。</strong> 比如”查产品价格”这种，每个问题都是特定的参数查询。这时候 RAG 反而绕了远路——直接用数据库查不是更简单吗？RAG 的优势在于语义搜索，即你不知道用户会怎么表达他的需求，需要靠”语义近似”来找到相关内容。当查询精确可预测时，传统数据库就够用了。</p>
+<p>我自己的经验是：先用”全塞 prompt”跑通你的 MVP。当 prompt 太长或者知识需要频繁更新了，再考虑上 RAG。不要为了时髦而卷技术栈。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/RAG/" rel="tag"># RAG</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/11/22/JVM-%E5%86%85%E5%AD%98%E7%BB%93%E6%9E%84%E5%85%A5%E9%97%A8/" rel="prev" title="JVM 内存结构入门">
+                  <i class="fa fa-angle-left"></i> JVM 内存结构入门
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/12/20/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%85%A5%E9%97%A8-%E4%BB%8EGC-Roots%E8%AF%B4%E8%B5%B7/" rel="next" title="垃圾回收入门：从 GC Roots 说起">
+                  垃圾回收入门：从 GC Roots 说起 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

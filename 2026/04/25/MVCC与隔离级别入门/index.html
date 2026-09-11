@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="四种隔离级别与各自问题，MVCC三件套，RR下如何避免幻读，快照读vs当前读">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MVCC 与隔离级别入门">
+<meta property="og:url" content="https://aphthog.github.io/2026/04/25/MVCC%E4%B8%8E%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E5%85%A5%E9%97%A8/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="四种隔离级别与各自问题，MVCC三件套，RR下如何避免幻读，快照读vs当前读">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-25T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.399Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="MVCC">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="事务">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/04/25/MVCC%E4%B8%8E%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E5%85%A5%E9%97%A8/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/04/25/MVCC%E4%B8%8E%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E5%85%A5%E9%97%A8/","path":"2026/04/25/MVCC与隔离级别入门/","title":"MVCC 与隔离级别入门"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>MVCC 与隔离级别入门 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/04/25/MVCC%E4%B8%8E%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E5%85%A5%E9%97%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="MVCC 与隔离级别入门 | Camille">
+      <meta itemprop="description" content="四种隔离级别与各自问题，MVCC三件套，RR下如何避免幻读，快照读vs当前读">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MVCC 与隔离级别入门
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-04-25 21:00:00" itemprop="dateCreated datePublished" datetime="2026-04-25T21:00:00+00:00">2026-04-25</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">四种隔离级别与各自问题，MVCC三件套，RR下如何避免幻读，快照读vs当前读</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>之前面试被问过一个问题：”MySQL 默认隔离级别是什么？它怎么避免幻读的？”我答了 REPEATABLE READ、答了间隙锁，但面试官追问 MVCC 做了什么，我却没完全说清楚。回去翻了翻 MySQL 官方的文档和不少文章，才把 MVCC 和隔离级别的关系理清楚。</p>
+<h2 id="四种隔离级别"><a href="#四种隔离级别" class="headerlink" title="四种隔离级别"></a>四种隔离级别</h2><p>SQL 标准定义了四种隔离级别，每种对应不同的并发问题：</p>
+<table>
+<thead>
+<tr>
+<th>隔离级别</th>
+<th>脏读</th>
+<th>不可重复读</th>
+<th>幻读</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>READ UNCOMMITTED</td>
+<td>可能</td>
+<td>可能</td>
+<td>可能</td>
+</tr>
+<tr>
+<td>READ COMMITTED</td>
+<td>安全</td>
+<td>可能</td>
+<td>可能</td>
+</tr>
+<tr>
+<td>REPEATABLE READ</td>
+<td>安全</td>
+<td>安全</td>
+<td>可能（InnoDB 通过间隙锁解决）</td>
+</tr>
+<tr>
+<td>SERIALIZABLE</td>
+<td>安全</td>
+<td>安全</td>
+<td>安全</td>
+</tr>
+</tbody></table>
+<ul>
+<li><strong>脏读</strong>：读到另一个事务未提交的数据。如果那个事务回滚了，读到的是不存在的。</li>
+<li><strong>不可重复读</strong>：同一个事务里两次读同一行，结果不一样——被另一个已提交事务改了。</li>
+<li><strong>幻读</strong>：同一个事务里两次范围查询，第二次多出了几行——被另一个事务插入的新行。</li>
+</ul>
+<p>InnoDB 的默认隔离级别是 <strong>REPEATABLE READ（RR）</strong>。它用 MVCC 解决了不可重复读；用间隙锁解决了幻读（严格来说是大部分情况——后面解释）。</p>
+<h2 id="MVCC-三件套"><a href="#MVCC-三件套" class="headerlink" title="MVCC 三件套"></a>MVCC 三件套</h2><p>MVCC（Multi-Version Concurrency Control）让读操作不用加锁、不阻塞写操作。它的核心有三样东西。</p>
+<p><strong>1. 隐藏字段</strong></p>
+<p>InnoDB 聚簇索引的每行数据有三个隐藏列：</p>
+<ul>
+<li><code>DB_TRX_ID</code>：最近一次修改这行的事务 ID</li>
+<li><code>DB_ROLL_PTR</code>：指向 undo log 中该行上一个版本的指针（回滚指针）</li>
+<li><code>DB_ROW_ID</code>：隐藏自增 ID（没有主键时才用到）</li>
+</ul>
+<p><strong>2. undo log 版本链</strong></p>
+<p>每次 <code>UPDATE</code>，InnoDB 不会直接覆盖旧数据，而是把旧版本写入 undo log，然后通过 <code>DB_ROLL_PTR</code> 把新版本和旧版本串成一条链表。新版本在最前面，旧版本在后面。</p>
+<p><strong>3. ReadView</strong></p>
+<p>事务执行快照读（<code>SELECT</code>）时，InnoDB 会生成一个 ReadView，记录当前活跃事务的 ID 列表。ReadView 的核心逻辑是：</p>
+<ul>
+<li>如果数据行的 <code>DB_TRX_ID</code> 小于 ReadView 中最早活跃的 ID，说明这个版本在事务开始前已提交，可见。</li>
+<li>如果 <code>DB_TRX_ID</code> 等于当前事务 ID，自己改的当然可见。</li>
+<li>如果 <code>DB_TRX_ID</code> 大于 ReadView 中最晚的 ID，说明是在当前事务开始后才启动的事务，不可见。</li>
+<li>如果 <code>DB_TRX_ID</code> 在最小和最大之间且在活跃列表里，说明还没提交，不可见；不在活跃列表里则可见。</li>
+</ul>
+<p>不可见时，顺着 <code>DB_ROLL_PTR</code> 沿着 undo log 版本链往前找，直到找到一个可见的版本。</p>
+<h2 id="RR-和-RC-的区别"><a href="#RR-和-RC-的区别" class="headerlink" title="RR 和 RC 的区别"></a>RR 和 RC 的区别</h2><p>RC（READ COMMITTED）和 RR 在 ReadView 上的行为不同：</p>
+<ul>
+<li><strong>RC</strong>：每条 <code>SELECT</code> 语句都生成一个新的 ReadView。这意味着同一个事务里，两次 <code>SELECT</code> 可能看到不同的结果——解决了脏读，但不可重复读依然存在。</li>
+<li><strong>RR</strong>：整个事务只生成一次 ReadView（在第一条 <code>SELECT</code> 时）。后续的所有 <code>SELECT</code> 都用同一个 ReadView，所以读到的一直是事务开始时的快照，不可重复读被解决了。</li>
+</ul>
+<p>那幻读呢？MVCC 在 RR 下能防止大部分幻读：因为 ReadView 固定了，新插入的行对当前事务不可见。但有一个例外——<strong>当前读</strong>（<code>SELECT ... FOR UPDATE</code>、<code>UPDATE</code>、<code>DELETE</code>）会走最新数据，不受 ReadView 控制。纯靠 MVCC 解决不了这类幻读，所以 InnoDB 在 RR 下还用了间隙锁来阻挡新插入的数据。</p>
+<h2 id="一句话区分快照读和当前读"><a href="#一句话区分快照读和当前读" class="headerlink" title="一句话区分快照读和当前读"></a>一句话区分快照读和当前读</h2><ul>
+<li><strong>快照读</strong>：普通的 <code>SELECT</code>，不加锁，从 ReadView 可见的版本读——MVCC 保证读到的是一致性的历史快照，不阻塞其他事务的写。</li>
+<li><strong>当前读</strong>：<code>SELECT ... FOR UPDATE</code>、<code>SELECT ... LOCK IN SHARE MODE</code>、<code>UPDATE</code>、<code>DELETE</code>——读取最新已提交的数据，并加锁防止其他事务并发修改。</li>
+</ul>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>MVCC 是 InnoDB 高并发读能力的核心。它通过隐藏字段 + undo log 版本链 + ReadView 这套机制，让读不阻塞写、写不阻塞读，同时保证每个事务看到一致的数据视图。理解 ReadView 的生成时机，就理解了 RR 和 RC 最本质的区别。面试被问到隔离级别，从 MVCC 的角度答往往比背定义更能让对方觉得你真的懂了。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/%E4%BA%8B%E5%8A%A1/" rel="tag"># 事务</a>
+              <a href="/tags/MVCC/" rel="tag"># MVCC</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/04/11/%E4%BA%8B%E5%8A%A1%E4%B8%8EACID-%E4%BB%8E%E4%B8%80%E6%AC%A1%E8%BD%AC%E8%B4%A6%E8%AF%B4%E8%B5%B7/" rel="prev" title="事务与 ACID：从一次转账说起">
+                  <i class="fa fa-angle-left"></i> 事务与 ACID：从一次转账说起
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/05/09/%E8%A1%97%E8%A7%92/" rel="next" title="街角">
+                  街角 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

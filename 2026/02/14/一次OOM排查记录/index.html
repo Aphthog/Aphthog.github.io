@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="服务跑一夜 OOM 的排查：dump、MAT 支配树定位、本地缓存淘汰缺失修复">
+<meta property="og:type" content="article">
+<meta property="og:title" content="一次 OOM 排查记录">
+<meta property="og:url" content="https://aphthog.github.io/2026/02/14/%E4%B8%80%E6%AC%A1OOM%E6%8E%92%E6%9F%A5%E8%AE%B0%E5%BD%95/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="服务跑一夜 OOM 的排查：dump、MAT 支配树定位、本地缓存淘汰缺失修复">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-02-14T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.400Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="JVM">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="OOM">
+<meta property="article:tag" content="排查">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/02/14/%E4%B8%80%E6%AC%A1OOM%E6%8E%92%E6%9F%A5%E8%AE%B0%E5%BD%95/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/02/14/%E4%B8%80%E6%AC%A1OOM%E6%8E%92%E6%9F%A5%E8%AE%B0%E5%BD%95/","path":"2026/02/14/一次OOM排查记录/","title":"一次 OOM 排查记录"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>一次 OOM 排查记录 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/02/14/%E4%B8%80%E6%AC%A1OOM%E6%8E%92%E6%9F%A5%E8%AE%B0%E5%BD%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="一次 OOM 排查记录 | Camille">
+      <meta itemprop="description" content="服务跑一夜 OOM 的排查：dump、MAT 支配树定位、本地缓存淘汰缺失修复">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          一次 OOM 排查记录
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-02-14 21:00:00" itemprop="dateCreated datePublished" datetime="2026-02-14T21:00:00+00:00">2026-02-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">服务跑一夜 OOM 的排查：dump、MAT 支配树定位、本地缓存淘汰缺失修复</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>周一早上到工位，钉钉群里在 @我：凌晨三点线上服务挂了。第一件事查日志——<code>java.lang.OutOfMemoryError: Java heap space</code>，堆内存溢出。</p>
+<p>看监控面板，堆使用量在每次重启后从基线稳步往上爬，到凌晨三点左右冲到峰值然后 OOM——典型的<strong>内存泄漏</strong>形态，不是流量突增导致的瞬时 OOM。瞬时高峰的话，堆用完会跌回来，重启后不会每周重复同样趋势的上涨曲线。</p>
+<h2 id="加-HeapDumpOnOutOfMemoryError"><a href="#加-HeapDumpOnOutOfMemoryError" class="headerlink" title="加 HeapDumpOnOutOfMemoryError"></a>加 HeapDumpOnOutOfMemoryError</h2><p>之前已经加过 <code>-XX:+HeapDumpOnOutOfMemoryError</code> 参数，所以 OOM 时 JVM 自动生成了一份 heap dump 文件。如果你的线上服务还没加这个参数，建议加上——它在 OOM 时自动打出堆快照，不需要人工介入：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">-Xmx2g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/dumps/</span><br></pre></td></tr></table></figure>
+
+<p>有了 dump，排查就可以重现现场了。</p>
+<h2 id="MAT-支配树定位"><a href="#MAT-支配树定位" class="headerlink" title="MAT 支配树定位"></a>MAT 支配树定位</h2><p>把 dump 拉到 MAT（Memory Analyzer Tool）里打开。先看概览：堆一共 2GB，有一个 <code>java.util.concurrent.ConcurrentHashMap</code> 的实例占了几百 MB，加上它相关的内部对象，总保留大小接近 1.5GB。直觉告诉我这个 Map 有问题。</p>
+<p>在 MAT 里打开<strong>支配树（Dominator Tree）</strong> 视图。支配树是 MAT 最常用的功能：它计算每个对象”如果回收它，最多能释放多少内存”，然后按保留大小从大到小排序。排第一的就是上面那个 ConcurrentHashMap，它的 <code>table</code> 数组里装了几十万个 entry。</p>
+<h2 id="定位到只增不减的-Map"><a href="#定位到只增不减的-Map" class="headerlink" title="定位到只增不减的 Map"></a>定位到只增不减的 Map</h2><p>回到代码搜这个 Map 的引用，发现是一个<strong>本地缓存</strong>——逻辑是从数据库加载配置数据，为了避免每次都查 DB，用 <code>ConcurrentHashMap</code> 缓存起来：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">ConfigCache</span> &#123;</span><br><span class="line">    <span class="comment">// 本地缓存，只 put，没有淘汰</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Map&lt;String, Config&gt; cache = <span class="keyword">new</span> <span class="title class_">ConcurrentHashMap</span>&lt;&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> Config <span class="title function_">get</span><span class="params">(String key)</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> cache.computeIfAbsent(key, <span class="built_in">this</span>::loadFromDb);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>问题很清楚：<code>computeIfAbsent</code> 保证每个 key 只加载一次、加载过就不重复查 DB，但<strong>缓存容量没有上限</strong>。如果 key 的基数没有上限——比如每次请求都会带上用户 ID 相关的唯一键——这个 Map 会一直增长。线上跑了十几个小时，几百万个不同的 key 把堆塞满了。</p>
+<h2 id="根因：本地缓存没做淘汰"><a href="#根因：本地缓存没做淘汰" class="headerlink" title="根因：本地缓存没做淘汰"></a>根因：本地缓存没做淘汰</h2><p>这就是典型的”缓存但没做淘汰策略”——以为放个 Map 就完事了，忘了考虑它会一直往里加东西。我犯的错是把缓存理解成了”前一次查询结果的复用”，没有问自己：这些数据真的需要一直留着吗？</p>
+<p>修复方案我选用了 Caffeine 做本地缓存：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Cache&lt;String, Config&gt; cache = Caffeine.newBuilder()</span><br><span class="line">    .maximumSize(<span class="number">10_000</span>)                <span class="comment">// 最多存 1 万条</span></span><br><span class="line">    .expireAfterWrite(<span class="number">30</span>, TimeUnit.MINUTES)  <span class="comment">// 写入 30 分钟后过期</span></span><br><span class="line">    .recordStats()                      <span class="comment">// 记录命中率，方便调优</span></span><br><span class="line">    .build();</span><br></pre></td></tr></table></figure>
+
+<p>Caffeine 用 W-TinyLFU 淘汰算法，比 LRU 更能区分”真正常用的 key”和”仅仅是最近上过热门、以后不会再来”的 key。</p>
+<p>如果你不想引入第三方依赖，也可以用 <code>LinkedHashMap</code> 手写一个简单的 LRU 缓存：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">LruCache</span>&lt;K, V&gt; <span class="keyword">extends</span> <span class="title class_">LinkedHashMap</span>&lt;K, V&gt; &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="type">int</span> maxSize;</span><br><span class="line"></span><br><span class="line">    LruCache(<span class="type">int</span> maxSize) &#123;</span><br><span class="line">        <span class="built_in">super</span>(<span class="number">16</span>, <span class="number">0.75f</span>, <span class="literal">true</span>);  <span class="comment">// access-order = true</span></span><br><span class="line">        <span class="built_in">this</span>.maxSize = maxSize;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="keyword">protected</span> <span class="type">boolean</span> <span class="title function_">removeEldestEntry</span><span class="params">(Map.Entry&lt;K, V&gt; eldest)</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> size() &gt; maxSize;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>核心思路一样：<strong>给缓存一个上限，超了就淘汰最不常用的</strong>。</p>
+<h2 id="复盘"><a href="#复盘" class="headerlink" title="复盘"></a>复盘</h2><p>这次 OOM 排查让我养成了三个习惯：</p>
+<ol>
+<li><strong>生产环境提前加 HeapDumpOnOutOfMemoryError</strong>——没有 dump，排查 OOM 基本靠猜。这个参数应该在每个 Java 应用的启动脚本里默认加上。</li>
+<li><strong>写缓存之前先想淘汰策略</strong>——不加淘汰策略的本地缓存不是一个缓存，是一个泄洪的内存漏洞。<code>ConcurrentHashMap</code> 用 <code>computeIfAbsent</code> 太顺手了，顺手到容易忘了加上限。</li>
+<li><strong>MAT 支配树是 OOM 排查的第一选择</strong>——不用人肉翻代码猜哪个对象大，支配树直接告诉你”回收谁释放最多”，顺着排序找对应的业务代码就行。</li>
+</ol>
+<p>这次的问题本质上是一个低级错误：用了 Map 做缓存但没设上限。写出来不觉得高明，但犯错的过程挺值得记——以后再写本地缓存，写之前会先问自己一句”满了怎么办”。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/JVM/" rel="tag"># JVM</a>
+              <a href="/tags/%E6%8E%92%E6%9F%A5/" rel="tag"># 排查</a>
+              <a href="/tags/OOM/" rel="tag"># OOM</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/02/07/Function-Calling-%E8%AE%A9%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%BC%9A%E8%B0%83%E7%94%A8%E5%B7%A5%E5%85%B7/" rel="prev" title="Function Calling：让模型学会调用工具">
+                  <i class="fa fa-angle-left"></i> Function Calling：让模型学会调用工具
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/02/28/MySQL-%E7%B4%A2%E5%BC%95%E5%85%A5%E9%97%A8-B+%E6%A0%91%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%AB/" rel="next" title="MySQL 索引入门：B+ 树为什么快">
+                  MySQL 索引入门：B+ 树为什么快 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

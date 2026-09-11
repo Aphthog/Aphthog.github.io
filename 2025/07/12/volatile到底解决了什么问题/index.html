@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="volatile 的可见性与有序性保证、内存屏障直觉，以及它为什么替代不了锁">
+<meta property="og:type" content="article">
+<meta property="og:title" content="volatile 到底解决了什么问题">
+<meta property="og:url" content="https://aphthog.github.io/2025/07/12/volatile%E5%88%B0%E5%BA%95%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="volatile 的可见性与有序性保证、内存屏障直觉，以及它为什么替代不了锁">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-07-12T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.400Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="volatile">
+<meta property="article:tag" content="并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/07/12/volatile%E5%88%B0%E5%BA%95%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/07/12/volatile%E5%88%B0%E5%BA%95%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98/","path":"2025/07/12/volatile到底解决了什么问题/","title":"volatile 到底解决了什么问题"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>volatile 到底解决了什么问题 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/07/12/volatile%E5%88%B0%E5%BA%95%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="volatile 到底解决了什么问题 | Camille">
+      <meta itemprop="description" content="volatile 的可见性与有序性保证、内存屏障直觉，以及它为什么替代不了锁">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          volatile 到底解决了什么问题
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-07-12 21:00:00" itemprop="dateCreated datePublished" datetime="2025-07-12T21:00:00+00:00">2025-07-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">volatile 的可见性与有序性保证、内存屏障直觉，以及它为什么替代不了锁</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>前阵子 review 代码，看到一个线程里用 <code>volatile</code> 修饰的循环开关，同事顺手把 <code>volatile</code> 删了，说”这个变量就一个线程写，加了浪费”。我当时说不上来为什么不能删，只记得书上看过。</p>
+<p>后来回去补了下课，又写了个小实验才明白：那行 <code>volatile</code> 管的不是”谁写”，是”写了之后别人看不见怎么办”。这篇把当时想清楚的东西整理一下。</p>
+<h2 id="可见性：修改变量之后，别人什么时候能看到"><a href="#可见性：修改变量之后，别人什么时候能看到" class="headerlink" title="可见性：修改变量之后，别人什么时候能看到"></a>可见性：修改变量之后，别人什么时候能看到</h2><p>上一篇里可见性只是一笔带过，这里单独展开——因为 <code>volatile</code> 最主要的作用就是解决它。</p>
+<p>事情的本质是这样：JMM 里每个线程有自己的工作内存，读变量不一定去主内存。一个线程在循环里判断 <code>while (running) { ... }</code> 时，JIT 很可能把 <code>running</code> 的值缓存进寄存器——因为循环体里没有写操作，编译器认为读到的值不会变，就把读操作提到循环外面了。主线程那边把 <code>running</code> 改成 <code>false</code>，改的是主内存；工作线程还在读自己寄存器里的旧值，于是死循环。</p>
+<p>加 <code>volatile</code> 之后，读操作被强制从主内存重新读，写操作也会立即刷回主内存，工作线程就能在下一轮循环看到变化。我照着写了个对照实验（JDK 17）：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">volatile</span> <span class="type">boolean</span> <span class="variable">running</span> <span class="operator">=</span> <span class="literal">true</span>;</span><br><span class="line"><span class="comment">// 工作线程：while (running) &#123; n++; &#125;</span></span><br><span class="line"><span class="comment">// 主线程：睡 500ms，然后 running = false;</span></span><br></pre></td></tr></table></figure>
+
+<p>输出是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">main set running=false</span><br><span class="line">worker stopped, looped 1712067363</span><br></pre></td></tr></table></figure>
+
+<p>worker 在几百毫秒内退出了循环，<code>join(3000)</code> 也顺利返回。</p>
+<p>这里我得诚实一点：<strong>把 <code>volatile</code> 去掉，这个实验未必每次都能复现死循环。</strong> 这取决于 JIT 有没有真正把读操作提出去，跟运行时长、机器、循环体复杂程度都有关系。所以这个实验的正确结论不是”没有 volatile 就一定卡死”，而是”有 volatile 才有确定的可见性保证”。没复现不代表写对了，只是运气好。</p>
+<h2 id="内存屏障：volatile-靠什么保证可见性"><a href="#内存屏障：volatile-靠什么保证可见性" class="headerlink" title="内存屏障：volatile 靠什么保证可见性"></a>内存屏障：volatile 靠什么保证可见性</h2><p><code>volatile</code> 靠的是<strong>内存屏障</strong>（memory barrier）。可以把它想象成一道栅栏：指令不能随意翻过它。</p>
+<p>往 <code>volatile</code> 变量写之前，插入一道写屏障，把之前所有修改都刷回主内存；读之后插入一道读屏障，让之后的读都重新取。同时这些屏障也挡住了跨越它的指令重排，所以 <code>volatile</code> 顺带提供了<strong>有序性</strong>——这就是 DCL 单例里给 <code>instance</code> 加 <code>volatile</code> 能解决问题的原因。</p>
+<p>不用去背屏障的具体类型（LoadLoad、StoreStore 那些），记住这个直觉就够了：<strong><code>volatile</code> 的写会”公开”之前的修改，<code>volatile</code> 的读会”作废”之后的缓存</strong>。</p>
+<h2 id="一个看起来很别扭的例子"><a href="#一个看起来很别扭的例子" class="headerlink" title="一个看起来很别扭的例子"></a>一个看起来很别扭的例子</h2><p>理解了可见性，就能明白为什么有些 <code>volatile</code> 看着多余。下面这个循环开关是经典写法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Worker</span> <span class="keyword">implements</span> <span class="title class_">Runnable</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">volatile</span> <span class="type">boolean</span> <span class="variable">stopped</span> <span class="operator">=</span> <span class="literal">false</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">stop</span><span class="params">()</span> &#123;</span><br><span class="line">        stopped = <span class="literal">true</span>;              <span class="comment">// 另一个线程调用</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">run</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">while</span> (!stopped) &#123;</span><br><span class="line">            doSomething();           <span class="comment">// 循环体里没有对 stopped 的写</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从单线程视角看，<code>stopped</code> 只在 <code>stop()</code> 里被写、在 <code>run()</code> 里被读，加 <code>volatile</code> 好像什么也没改变。但正是”循环体里没有写”这件事，让编译器有充分理由把 <code>stopped</code> 的读取优化掉。这个 <code>volatile</code> 一点都不多余，它是在告诉 JVM：每次都老老实实去主内存读。</p>
+<h2 id="volatile-替代不了锁"><a href="#volatile-替代不了锁" class="headerlink" title="volatile 替代不了锁"></a>volatile 替代不了锁</h2><p><code>volatile</code> 被说得最多的问题，是有人拿它当轻量级锁用。它保证可见性和有序性，<strong>但不保证原子性</strong>。用 <code>i++</code> 做个反例最直接。</p>
+<p>我把上一篇文章里那个计数器换成 <code>volatile int</code> 再跑一遍——4 个线程、每个 10 万次自增，期望 400000：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">volatile int   = 203828 (expect 400000)</span><br><span class="line">volatile int   = 191091 (expect 400000)</span><br></pre></td></tr></table></figure>
+
+<p>还是丢更新。原因很简单：<code>volatile</code> 保证的是”每次读都拿到最新值、每次写都马上让别人看到”，可 <code>i++</code> 是<strong>读-改-写</strong>三步。两个线程完全可以都读到最新的 5，各自算出 6，各自写回 6——每一步都符合 <code>volatile</code> 的规则，合起来还是少加了一次。原子性的问题，<code>volatile</code> 管不着。</p>
+<p>（对比一下同一份实验里的另外两行：普通 <code>int</code> 是 121418、120499，<code>AtomicInteger</code> 是稳定的 400000。<code>AtomicInteger</code> 用的是 CAS，那是它另一个话题。）</p>
+<h2 id="什么时候该用-volatile"><a href="#什么时候该用-volatile" class="headerlink" title="什么时候该用 volatile"></a>什么时候该用 volatile</h2><p>我的经验是它只适合两种情况：<strong>一个线程写、其他线程读的状态标志位</strong>，以及<strong>作为其他同步手段的辅助</strong>（比如 DCL 里禁止重排）。一旦涉及”读出来算一下再写回去”，就该换成锁或原子类了。</p>
+<p>判断标准其实一句话：变量本身是<strong>独立的、自洽的</strong>（写入的是最终值，不依赖旧值），<code>volatile</code> 够用；只要写之前需要先读旧值，它就不够。那个循环开关属于前者，<code>i++</code> 属于后者——同样是”多线程读写一个变量”，结论完全相反。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/volatile/" rel="tag"># volatile</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/06/14/%E7%BA%BF%E7%A8%8B%E5%AE%89%E5%85%A8%E7%9A%84%E4%B8%89%E7%B1%BB%E9%97%AE%E9%A2%98-%E5%8E%9F%E5%AD%90%E6%80%A7-%E5%8F%AF%E8%A7%81%E6%80%A7-%E6%9C%89%E5%BA%8F%E6%80%A7/" rel="prev" title="线程安全的三类问题：原子性、可见性、有序性">
+                  <i class="fa fa-angle-left"></i> 线程安全的三类问题：原子性、可见性、有序性
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/08/16/synchronized%E5%92%8CReentrantLock%E7%9A%84%E5%8C%BA%E5%88%AB/" rel="next" title="synchronized 和 ReentrantLock 的区别">
+                  synchronized 和 ReentrantLock 的区别 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

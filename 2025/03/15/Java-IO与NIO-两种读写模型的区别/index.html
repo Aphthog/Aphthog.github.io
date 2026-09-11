@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="BIO 的流与阻塞、NIO 的 Channel 与 Selector，以及各自的适用场景">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Java IO 与 NIO：两种读写模型的区别">
+<meta property="og:url" content="https://aphthog.github.io/2025/03/15/Java-IO%E4%B8%8ENIO-%E4%B8%A4%E7%A7%8D%E8%AF%BB%E5%86%99%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%8C%BA%E5%88%AB/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="BIO 的流与阻塞、NIO 的 Channel 与 Selector，以及各自的适用场景">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-03-15T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.399Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="IO">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="NIO">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/03/15/Java-IO%E4%B8%8ENIO-%E4%B8%A4%E7%A7%8D%E8%AF%BB%E5%86%99%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%8C%BA%E5%88%AB/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/03/15/Java-IO%E4%B8%8ENIO-%E4%B8%A4%E7%A7%8D%E8%AF%BB%E5%86%99%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%8C%BA%E5%88%AB/","path":"2025/03/15/Java-IO与NIO-两种读写模型的区别/","title":"Java IO 与 NIO：两种读写模型的区别"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Java IO 与 NIO：两种读写模型的区别 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/03/15/Java-IO%E4%B8%8ENIO-%E4%B8%A4%E7%A7%8D%E8%AF%BB%E5%86%99%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%8C%BA%E5%88%AB/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Java IO 与 NIO：两种读写模型的区别 | Camille">
+      <meta itemprop="description" content="BIO 的流与阻塞、NIO 的 Channel 与 Selector，以及各自的适用场景">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Java IO 与 NIO：两种读写模型的区别
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-03-15 21:00:00" itemprop="dateCreated datePublished" datetime="2025-03-15T21:00:00+00:00">2025-03-15</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">BIO 的流与阻塞、NIO 的 Channel 与 Selector，以及各自的适用场景</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>大二写过一个很小的 Socket 服务端，用 <code>ServerSocket</code> 收连接、收数据、回一句话。本地测试只开一个客户端时一切正常，同时开两个浏览器窗口去连，第二个请求就一直转圈，得等第一个处理完才有响应。当时以为是代码写漏了什么，翻来覆去改了半天才对上号——这不是 bug，是 BIO 这个模型本来的样子。</p>
+<p>这篇把两种模型放在一起对照一下，只说读写模型本身的区别，不碰 Netty。</p>
+<h2 id="最朴素的写法长什么样"><a href="#最朴素的写法长什么样" class="headerlink" title="最朴素的写法长什么样"></a>最朴素的写法长什么样</h2><p>先用最朴素的 <code>FileInputStream</code> 读文件感受一下：<code>int n = in.read(buf)</code> 会一直卡到数据就绪，这期间当前线程什么都干不了。同样的卡顿我在 Socket 上也遇到过，而且那次的感受更直接——先看那段让我困惑的代码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">try</span> (<span class="type">ServerSocket</span> <span class="variable">server</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ServerSocket</span>(<span class="number">8080</span>)) &#123;</span><br><span class="line">    <span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">        <span class="type">Socket</span> <span class="variable">socket</span> <span class="operator">=</span> server.accept();          <span class="comment">// 卡在这里，直到有连接进来</span></span><br><span class="line">        <span class="type">InputStream</span> <span class="variable">in</span> <span class="operator">=</span> socket.getInputStream();</span><br><span class="line">        <span class="type">byte</span>[] buf = <span class="keyword">new</span> <span class="title class_">byte</span>[<span class="number">1024</span>];</span><br><span class="line">        <span class="type">int</span> <span class="variable">n</span> <span class="operator">=</span> in.read(buf);                     <span class="comment">// 再卡在这里，直到有数据可读</span></span><br><span class="line">        <span class="comment">// ...处理并写回</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>accept()</code> 会一直阻塞，直到真的有客户端连上来；<code>read()</code> 也会一直阻塞，直到对端把数据发过来。也就是说，这个循环同一时刻只服务一个连接，第二个连接只能排在后面等。这就是「阻塞」两个字的实际含义。</p>
+<h2 id="BIO：流-阻塞-一连接一线程"><a href="#BIO：流-阻塞-一连接一线程" class="headerlink" title="BIO：流 + 阻塞 + 一连接一线程"></a>BIO：流 + 阻塞 + 一连接一线程</h2><p>BIO 的数据载体是<strong>流</strong>（<code>InputStream</code> &#x2F; <code>OutputStream</code>）。流是单向的，要么只能读，要么只能写；数据像水流一样顺序过来，读完就过去了。</p>
+<p>要让多个连接同时被服务，最直接的办法是每个连接开一个线程：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    <span class="type">Socket</span> <span class="variable">socket</span> <span class="operator">=</span> server.accept();</span><br><span class="line">    <span class="keyword">new</span> <span class="title class_">Thread</span>(() -&gt; handle(socket)).start();   <span class="comment">// 一个连接一个线程</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这样确实能并发了，但线程是有成本的。每个线程默认要预留几百 KB 到 1MB 的栈空间，一万个线程就是几 GB 的栈空间预留——栈是按需提交的，一个阻塞在 <code>read()</code> 上的线程实际驻留的内存只有几 KB，真正吃掉的是地址空间；更亏的是，这些线程绝大多数时间都阻塞在 <code>read()</code> 上，什么也不干，只是在占着资源陪着连接等数据。连接数一上去，瓶颈不在 CPU，在内存和线程调度上。这就是当年 C10K 问题要解决的事情。</p>
+<h2 id="NIO：Channel-Buffer-Selector"><a href="#NIO：Channel-Buffer-Selector" class="headerlink" title="NIO：Channel + Buffer + Selector"></a>NIO：Channel + Buffer + Selector</h2><p>Java 1.4 引入了 NIO，换了一套模型。核心是三个概念：</p>
+<ul>
+<li><strong>Channel</strong>：双向的，既能读也能写（对比流的单向）。</li>
+<li><strong>Buffer</strong>：读写的中转站。数据不是直接从 Channel 拿出来，而是先读进 Buffer，再从 Buffer 里取；写的时候反过来，先写进 Buffer，再从 Buffer 送进 Channel。Buffer 靠 <code>position</code>、<code>limit</code>、<code>capacity</code> 三个位置指针协作，所以读写切换时要 <code>flip()</code> 一下。</li>
+<li><strong>Selector</strong>：多路复用器，是 NIO 的关键。把多个 Channel 注册到同一个 Selector 上，一个线程调一次 <code>select()</code>，就能等到”哪些 Channel 有事件就绪”。</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">Selector</span> <span class="variable">selector</span> <span class="operator">=</span> Selector.open();</span><br><span class="line"><span class="type">ServerSocketChannel</span> <span class="variable">serverChannel</span> <span class="operator">=</span> ServerSocketChannel.open();</span><br><span class="line">serverChannel.bind(<span class="keyword">new</span> <span class="title class_">InetSocketAddress</span>(<span class="number">8080</span>));</span><br><span class="line">serverChannel.configureBlocking(<span class="literal">false</span>);                  <span class="comment">// 不阻塞才能注册进 Selector</span></span><br><span class="line">serverChannel.register(selector, SelectionKey.OP_ACCEPT);</span><br><span class="line"></span><br><span class="line"><span class="keyword">while</span> (<span class="literal">true</span>) &#123;</span><br><span class="line">    selector.select();                                   <span class="comment">// 阻塞，直到至少一个 Channel 就绪</span></span><br><span class="line">    Iterator&lt;SelectionKey&gt; it = selector.selectedKeys().iterator();</span><br><span class="line">    <span class="keyword">while</span> (it.hasNext()) &#123;</span><br><span class="line">        <span class="type">SelectionKey</span> <span class="variable">key</span> <span class="operator">=</span> it.next();</span><br><span class="line">        it.remove();                                     <span class="comment">// 必须移除，否则下次 select 还会返回这个 key</span></span><br><span class="line">        <span class="keyword">if</span> (key.isAcceptable()) &#123;</span><br><span class="line">            <span class="type">SocketChannel</span> <span class="variable">client</span> <span class="operator">=</span> serverChannel.accept();</span><br><span class="line">            client.configureBlocking(<span class="literal">false</span>);</span><br><span class="line">            client.register(selector, SelectionKey.OP_READ);</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (key.isReadable()) &#123;</span><br><span class="line">            <span class="comment">// 把数据读进 Buffer，flip 之后再取出来处理</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>关键在于线程不再”陪”某个连接等数据了。它等的是 Selector 的一句通知：谁准备好了告诉我。底层靠的是操作系统的多路复用（select &#x2F; poll &#x2F; epoll），这块不展开。于是一个线程就能照看成千上万个连接。</p>
+<h2 id="怎么选"><a href="#怎么选" class="headerlink" title="怎么选"></a>怎么选</h2><table>
+<thead>
+<tr>
+<th></th>
+<th>BIO</th>
+<th>NIO</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>数据载体</td>
+<td>流，单向</td>
+<td>Channel + Buffer，双向</td>
+</tr>
+<tr>
+<td>阻塞行为</td>
+<td>accept &#x2F; read 会阻塞</td>
+<td>可设为非阻塞，交给 Selector 统一等</td>
+</tr>
+<tr>
+<td>线程模型</td>
+<td>一连接一线程</td>
+<td>一个线程管多个连接</td>
+</tr>
+<tr>
+<td>编程难度</td>
+<td>直观，接近人的思维</td>
+<td>复杂，要自己处理半包粘包和 Buffer 状态</td>
+</tr>
+<tr>
+<td>适用场景</td>
+<td>连接数少且可控、请求-响应式</td>
+<td>连接数多、单连接数据量小或活跃度低</td>
+</tr>
+</tbody></table>
+<p>我的判断标准很简单：</p>
+<ul>
+<li>连接数在几十到几百、逻辑不复杂，那 BIO 完全够用，代码直白，出问题好查。</li>
+<li>连接数上万而且大部分时间是空闲的——比如长连接推送、IM、网关——NIO 的多路复用才有意义。</li>
+</ul>
+<p>有个误区值得说清楚：<strong>NIO 不等于更快</strong>。连接少的时候它甚至可能比 BIO 慢，因为多了 Selector 事件分发和 Buffer 拷贝的开销。它解决的是”连接很多但大部分没数据”时的可扩展性，不是单连接的吞吐。选型要看场景，不是看谁更新。</p>
+<h2 id="一个容易混的概念"><a href="#一个容易混的概念" class="headerlink" title="一个容易混的概念"></a>一个容易混的概念</h2><p>最后补一个面试常问的点。阻塞 &#x2F; 非阻塞说的是<strong>一次调用的行为</strong>：没数据时调用方是干等，还是立刻返回。同步 &#x2F; 异步说的是<strong>数据就绪后由谁来完成读写</strong>：应用自己读，还是内核读完再通知你。</p>
+<p>按这个划分，NIO 严格说是”同步非阻塞”——它只是不再阻塞等待，数据还是要应用自己从 Channel 读进 Buffer。真正的异步 IO 是 Java 7 才加的 AIO（NIO.2），由内核把数据读完再回调。日常说的”NIO 是异步的”其实是把这两件事混在了一起。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/IO/" rel="tag"># IO</a>
+              <a href="/tags/NIO/" rel="tag"># NIO</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/02/16/HashMap-%E5%85%A5%E9%97%A8-%E4%BB%8Eput%E5%88%B0%E6%89%A9%E5%AE%B9/" rel="prev" title="HashMap 入门：从 put 到扩容">
+                  <i class="fa fa-angle-left"></i> HashMap 入门：从 put 到扩容
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/04/12/%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86%E5%85%A5%E9%97%A8-checked%E5%92%8Cunchecked%E5%B7%AE%E5%9C%A8%E5%93%AA/" rel="next" title="异常处理入门：checked 和 unchecked 差在哪">
+                  异常处理入门：checked 和 unchecked 差在哪 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="四种缓存更新策略的并发问题分析与不一致窗口缩小方案">
+<meta property="og:type" content="article">
+<meta property="og:title" content="缓存与数据库的一致性入门">
+<meta property="og:url" content="https://aphthog.github.io/2026/09/05/%E7%BC%93%E5%AD%98%E4%B8%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7%E5%85%A5%E9%97%A8/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="四种缓存更新策略的并发问题分析与不一致窗口缩小方案">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-09-05T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.401Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="一致性">
+<meta property="article:tag" content="缓存">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/09/05/%E7%BC%93%E5%AD%98%E4%B8%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7%E5%85%A5%E9%97%A8/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/09/05/%E7%BC%93%E5%AD%98%E4%B8%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7%E5%85%A5%E9%97%A8/","path":"2026/09/05/缓存与数据库的一致性入门/","title":"缓存与数据库的一致性入门"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>缓存与数据库的一致性入门 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/09/05/%E7%BC%93%E5%AD%98%E4%B8%8E%E6%95%B0%E6%8D%AE%E5%BA%93%E7%9A%84%E4%B8%80%E8%87%B4%E6%80%A7%E5%85%A5%E9%97%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="缓存与数据库的一致性入门 | Camille">
+      <meta itemprop="description" content="四种缓存更新策略的并发问题分析与不一致窗口缩小方案">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          缓存与数据库的一致性入门
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-09-05 21:00:00" itemprop="dateCreated datePublished" datetime="2026-09-05T21:00:00+00:00">2026-09-05</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">四种缓存更新策略的并发问题分析与不一致窗口缩小方案</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>数据不一致的问题排查了一个下午。</p>
+<p>业务上用户改了昵称，数据库里已经更新了，但前端的页面上还是旧名字。缓存没删掉。后台的同事说他只改了库，没管缓存——“缓存等它过期不就行了？”问题是缓存过期时间设了 24 小时，用户要等一天才能看到自己的新昵称。这就是缓存和数据库之间的不一致。</p>
+<h2 id="为什么会有不一致"><a href="#为什么会有不一致" class="headerlink" title="为什么会有不一致"></a>为什么会有不一致</h2><p>用了缓存之后，数据同时在数据库和缓存里存了两份。更新的时候先改哪个、删不删、什么时候删——顺序和时机稍有不同就会出现不一致。下面列四种常见的更新顺序以及各自的坑。</p>
+<h2 id="四种更新组合"><a href="#四种更新组合" class="headerlink" title="四种更新组合"></a>四种更新组合</h2><h3 id="方案一：先删缓存，再更新数据库"><a href="#方案一：先删缓存，再更新数据库" class="headerlink" title="方案一：先删缓存，再更新数据库"></a>方案一：先删缓存，再更新数据库</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">deleteCache(key);      <span class="comment">// 先删缓存</span></span><br><span class="line">updateDB(data);        <span class="comment">// 再更新数据库</span></span><br></pre></td></tr></table></figure>
+
+<p>并发下有个典型的”空窗期”：线程 A 删了缓存，还没来得及写库；线程 B 来读数据，缓存没有，从库读到旧值写回缓存。等线程 A 写完库，缓存里存的已经是线程 B 写入的旧值了。数据库是新数据，缓存是旧数据——不一致。</p>
+<h3 id="方案二：先更新数据库，再删缓存（Cache-Aside）"><a href="#方案二：先更新数据库，再删缓存（Cache-Aside）" class="headerlink" title="方案二：先更新数据库，再删缓存（Cache Aside）"></a>方案二：先更新数据库，再删缓存（Cache Aside）</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">updateDB(data);        <span class="comment">// 先更新数据库</span></span><br><span class="line">deleteCache(key);      <span class="comment">// 再删缓存</span></span><br></pre></td></tr></table></figure>
+
+<p>这是目前最被推荐的做法——即 Cache Aside 模式。缓存不做更新，只做删除。下次读取时发现缓存没有，回数据库查最新的再写回缓存。</p>
+<p>但并发下仍然有问题：线程 A 读数据，缓存没命中，读到了数据库的旧值（还没写回缓存）；线程 B 在这时更新数据库，并删了缓存；线程 A 接着把刚才读到的旧值写回缓存。结果是缓存里存了旧数据。</p>
+<p>这个窗口确实存在，但比方案一要小得多——条件很苛刻：必须是读比写慢、读刚好发生在更新事务提交和缓存删除之间的毫秒级间隙里、并且读到的结果在回写缓存之前没被写入覆盖。即便如此，理论上的不一致窗口仍然存在。</p>
+<h3 id="方案三：先删缓存，再更新数据库，延迟再删一次（延迟双删）"><a href="#方案三：先删缓存，再更新数据库，延迟再删一次（延迟双删）" class="headerlink" title="方案三：先删缓存，再更新数据库，延迟再删一次（延迟双删）"></a>方案三：先删缓存，再更新数据库，延迟再删一次（延迟双删）</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">deleteCache(key);      <span class="comment">// 第一次删</span></span><br><span class="line">updateDB(data);        <span class="comment">// 更新数据库</span></span><br><span class="line">Thread.sleep(<span class="number">500</span>);     <span class="comment">// 等一会</span></span><br><span class="line">deleteCache(key);      <span class="comment">// 第二次删</span></span><br></pre></td></tr></table></figure>
+
+<p>延迟双删的核心逻辑是：在这 500 毫秒里，如果有线程读了旧值写回缓存，第二次删除会把它清掉。延迟时间通常设为数据库主从同步延迟的 2 倍，比如从库延迟 200ms 就等 500ms。</p>
+<p>但依赖 <code>sleep</code> 会让接口响应变长，实际项目中一般用异步消息队列去执行第二次删除，主线程不阻塞。</p>
+<h3 id="方案四：先更新数据库，再更新缓存"><a href="#方案四：先更新数据库，再更新缓存" class="headerlink" title="方案四：先更新数据库，再更新缓存"></a>方案四：先更新数据库，再更新缓存</h3><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">updateDB(data);        <span class="comment">// 先更新数据库</span></span><br><span class="line">setCache(key, data);   <span class="comment">// 再更新缓存</span></span><br></pre></td></tr></table></figure>
+
+<p>听起来自然，但问题也更多：如果两个线程同时对同一个数据发起更新，缓存和数据库的更新顺序可能不一致——A 改值为 1，B 改值为 2，数据库中最终是 B 的 2，缓存中可能是 A 的 1。而且缓存里存的计算结果和数据库字段之间可能存在数据格式差异，更新逻辑比删除复杂。所以业界共识是不推荐这个做法。</p>
+<h2 id="为什么推荐-Cache-Aside"><a href="#为什么推荐-Cache-Aside" class="headerlink" title="为什么推荐 Cache Aside"></a>为什么推荐 Cache Aside</h2><p>对比下来，Cache Aside（先更新库、再删缓存）是四个方案里不一致窗口最小的。背后的原因其实很简单：</p>
+<ul>
+<li>删除是幂等的，删多少次都一样。而更新需要知道最新的值是什么。</li>
+<li>只要缓存删掉了，下一次读一定会从数据库拿最新的数据写回缓存。</li>
+<li>并发下往缓存里写脏数据的时间窗口短，触发条件苛刻。</li>
+</ul>
+<p>不过老实说：<strong>并发场景下没有完美方案，只能把不一致窗口缩小</strong>。不管是 Cache Aside 还是延迟双删，都不能提供强一致性——总有人能在某个瞬间读到旧数据。如果你需要强一致，就只能不用缓存，所有请求都走数据库。</p>
+<h2 id="不一致窗口到底多大"><a href="#不一致窗口到底多大" class="headerlink" title="不一致窗口到底多大"></a>不一致窗口到底多大</h2><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>不一致窗口</th>
+<th>风险等级</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>先删缓存再更新库</td>
+<td>更新 DB 前的整个时间段</td>
+<td>高</td>
+</tr>
+<tr>
+<td>先更新库再删缓存</td>
+<td>读早于写、回写晚于删的毫秒级窗口</td>
+<td>低</td>
+</tr>
+<tr>
+<td>延迟双删</td>
+<td>延迟时间以内</td>
+<td>极低</td>
+</tr>
+<tr>
+<td>先更新库再更新缓存</td>
+<td>并发更新顺序反转</td>
+<td>中</td>
+</tr>
+</tbody></table>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>缓存一致性没有银弹。选了 Cache Aside 加延迟双删，配合合理的过期兜底（过期时间不要太长，比如 1 小时），数据不一致的概率在大多数业务场景下可以接受。如果业务能接受最终一致性（大多数非金融场景都可以），这样做就足够了。如果真到了不能接受任何不一致的地步，去掉缓存可能是更诚实的做法。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+              <a href="/tags/%E7%BC%93%E5%AD%98/" rel="tag"># 缓存</a>
+              <a href="/tags/%E4%B8%80%E8%87%B4%E6%80%A7/" rel="tag"># 一致性</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/09/01/%E9%9D%A2%E7%BB%8F-%E5%8F%AA%E7%9C%8B%E7%AE%80%E5%8E%86%E7%9A%84%E6%A8%A1%E6%8B%9F%E4%B8%80%E9%9D%A2%E5%A4%8D%E7%9B%98-%E6%8B%BC%E5%9B%A2%E4%B8%8EQQ%E7%BE%A4AI%E5%8A%A9%E6%89%8B/" rel="prev" title="面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手）">
+                  <i class="fa fa-angle-left"></i> 面经：一场只看简历的模拟一面（拼团 + QQ 群 AI 助手）
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

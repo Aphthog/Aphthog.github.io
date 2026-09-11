@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="为什么B+树是MySQL索引的默认选择，从磁盘IO和范围查询的角度讲清楚">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MySQL 索引入门：B+ 树为什么快">
+<meta property="og:url" content="https://aphthog.github.io/2026/02/28/MySQL-%E7%B4%A2%E5%BC%95%E5%85%A5%E9%97%A8-B+%E6%A0%91%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%AB/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="为什么B+树是MySQL索引的默认选择，从磁盘IO和范围查询的角度讲清楚">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-02-28T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.399Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="索引">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/02/28/MySQL-%E7%B4%A2%E5%BC%95%E5%85%A5%E9%97%A8-B+%E6%A0%91%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%AB/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/02/28/MySQL-%E7%B4%A2%E5%BC%95%E5%85%A5%E9%97%A8-B+%E6%A0%91%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%AB/","path":"2026/02/28/MySQL-索引入门-B+树为什么快/","title":"MySQL 索引入门：B+ 树为什么快"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>MySQL 索引入门：B+ 树为什么快 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/02/28/MySQL-%E7%B4%A2%E5%BC%95%E5%85%A5%E9%97%A8-B+%E6%A0%91%E4%B8%BA%E4%BB%80%E4%B9%88%E5%BF%AB/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="MySQL 索引入门：B+ 树为什么快 | Camille">
+      <meta itemprop="description" content="为什么B+树是MySQL索引的默认选择，从磁盘IO和范围查询的角度讲清楚">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          MySQL 索引入门：B+ 树为什么快
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-02-28 21:00:00" itemprop="dateCreated datePublished" datetime="2026-02-28T21:00:00+00:00">2026-02-28</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">为什么B+树是MySQL索引的默认选择，从磁盘IO和范围查询的角度讲清楚</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>大三做课设的时候写了一个选课系统，MySQL 里一张选课记录表，几千条数据，查起来飞快。我心想数据库也就这么回事。后来实习，线上一个订单表几百万行，<code>WHERE order_status = 0</code> 的查询跑了三秒多。我才意识到，”快”是有前提的——数据量小的时候全表扫描也能接受，数据量一大，没有索引就是灾难。</p>
+<p>为什么不直接全表扫描？MySQL 默认把数据存在磁盘上（即使 SSD 也比内存慢几个数量级），全表扫描意味着把一整张表的每个数据页都从磁盘读到内存来判断。假设一个页 16KB，一张 500 万行的表大概占 500MB 以上的空间——每次查询都读一遍，磁盘 IO 次数非常可观。</p>
+<p>索引的本质就是<strong>拿空间换时间</strong>：建一个额外的数据结构，帮 MySQL 快速定位到目标行，不用从头翻到尾。</p>
+<h2 id="为什么不是二叉树"><a href="#为什么不是二叉树" class="headerlink" title="为什么不是二叉树"></a>为什么不是二叉树</h2><p>二叉树（BST）在最坏情况下退化成链表，IO 次数等于树高。就算用 AVL 树或者红黑树保持平衡，每个节点只存一个 key，树高仍然可观。InnoDB 一个数据页 16KB，二叉树每个节点存几十字节就占满一页，树高轻松十几二十层，查一次走二十次磁盘 IO，跟全表扫描差别不大。</p>
+<h2 id="为什么不是哈希"><a href="#为什么不是哈希" class="headerlink" title="为什么不是哈希"></a>为什么不是哈希</h2><p>哈希索引的致命弱点是<strong>不能做范围查询</strong>。<code>WHERE id &gt; 100</code> 这类条件，哈希表只能全扫。而且哈希碰撞处理不好也有性能损失。MySQL 的 Memory 引擎支持哈希索引，但 InnoDB 只用它做自适应哈希索引——一种自动优化的加速手段，不是用户能主动建的主要索引结构。</p>
+<h2 id="为什么是-B-树"><a href="#为什么是-B-树" class="headerlink" title="为什么是 B+ 树"></a>为什么是 B+ 树</h2><p>B+ 树解决了两个核心问题。</p>
+<p>第一是<strong>扇出大，树矮</strong>。B+ 树的非叶子节点只存索引 key，不存实际数据。一个 16KB 的页，key 如果是 bigint（8 字节），指针大约 6 字节，一个页可以存大约 1170 个 key 和指针（16KB &#x2F; 14 字节 ≈ 1170）。三层 B+ 树就能存 1170 × 1170 × 16 &#x3D; 2000 万以上行数据。也就是说，查 2000 万行的表，最多只需要 3 次磁盘 IO。</p>
+<p>第二是<strong>范围查询友好</strong>。B+ 树的叶子节点之间用双向链表串联，数据按 key 顺序排列。<code>WHERE id BETWEEN 100 AND 200</code> 查到 100 之后，顺着链表往后读就行，不需要回根节点重新遍历。这个特性对排序和范围条件很重要。</p>
+<p>对比一下：</p>
+<table>
+<thead>
+<tr>
+<th>结构</th>
+<th>单点查询</th>
+<th>范围查询</th>
+<th>磁盘 IO 次数（1000 万行）</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>哈希表</td>
+<td>O(1)</td>
+<td>不支持</td>
+<td>—</td>
+</tr>
+<tr>
+<td>红黑树</td>
+<td>O(logN)</td>
+<td>O(logN)</td>
+<td>~24 次（树高约 24）</td>
+</tr>
+<tr>
+<td>B+ 树</td>
+<td>O(logN)</td>
+<td>O(logN)（链表）</td>
+<td>3–4 次</td>
+</tr>
+</tbody></table>
+<h2 id="聚簇索引和二级索引"><a href="#聚簇索引和二级索引" class="headerlink" title="聚簇索引和二级索引"></a>聚簇索引和二级索引</h2><p>InnoDB 的表数据本身就是一棵 B+ 树，叫<strong>聚簇索引</strong>——叶子节点存的是整行数据。建表时指定的主键就是聚簇索引；如果没有主键，InnoDB 会选一个唯一非空列，或者自己生成一个隐藏的 <code>row_id</code>。</p>
+<p>其他索引（比如 <code>CREATE INDEX idx_name ON t(name)</code>）叫<strong>二级索引</strong>，它的叶子节点存的是主键值。所以通过二级索引查数据需要两步：先找到主键，再回聚簇索引查整行——这叫<strong>回表</strong>。这个概念后面还会用到，这里先记住就行。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>MySQL 选 B+ 树做索引不是巧合。相比二叉树，它树矮、IO 少；相比哈希表，它支持范围查询和排序。非叶子节点不存数据这个设计，让每个页能装更多 key，三层就能撑住千万级数据。对于绝大多数业务系统的数据量，B+ 树的磁盘 IO 开销是稳定的常数级别。写 SQL 的时候多问自己一句”这个查询能走索引吗”，就是优化的第一步。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/%E7%B4%A2%E5%BC%95/" rel="tag"># 索引</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/02/14/%E4%B8%80%E6%AC%A1OOM%E6%8E%92%E6%9F%A5%E8%AE%B0%E5%BD%95/" rel="prev" title="一次 OOM 排查记录">
+                  <i class="fa fa-angle-left"></i> 一次 OOM 排查记录
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/03/07/Agent-%E7%9A%84%E5%9F%BA%E6%9C%AC%E5%BE%AA%E7%8E%AF-%E6%84%9F%E7%9F%A5-%E5%86%B3%E7%AD%96-%E6%89%A7%E8%A1%8C/" rel="next" title="Agent 的基本循环：感知、决策、执行">
+                  Agent 的基本循环：感知、决策、执行 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从串行调接口的耗时切入，讲任务创建、组合、异常处理与线程池选择">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CompletableFuture 入门：把串行调用并行起来">
+<meta property="og:url" content="https://aphthog.github.io/2025/10/18/CompletableFuture%E5%85%A5%E9%97%A8-%E6%8A%8A%E4%B8%B2%E8%A1%8C%E8%B0%83%E7%94%A8%E5%B9%B6%E8%A1%8C%E8%B5%B7%E6%9D%A5/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="从串行调接口的耗时切入，讲任务创建、组合、异常处理与线程池选择">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-10-18T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.399Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="CompletableFuture">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/10/18/CompletableFuture%E5%85%A5%E9%97%A8-%E6%8A%8A%E4%B8%B2%E8%A1%8C%E8%B0%83%E7%94%A8%E5%B9%B6%E8%A1%8C%E8%B5%B7%E6%9D%A5/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/10/18/CompletableFuture%E5%85%A5%E9%97%A8-%E6%8A%8A%E4%B8%B2%E8%A1%8C%E8%B0%83%E7%94%A8%E5%B9%B6%E8%A1%8C%E8%B5%B7%E6%9D%A5/","path":"2025/10/18/CompletableFuture入门-把串行调用并行起来/","title":"CompletableFuture 入门：把串行调用并行起来"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>CompletableFuture 入门：把串行调用并行起来 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/10/18/CompletableFuture%E5%85%A5%E9%97%A8-%E6%8A%8A%E4%B8%B2%E8%A1%8C%E8%B0%83%E7%94%A8%E5%B9%B6%E8%A1%8C%E8%B5%B7%E6%9D%A5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="CompletableFuture 入门：把串行调用并行起来 | Camille">
+      <meta itemprop="description" content="从串行调接口的耗时切入，讲任务创建、组合、异常处理与线程池选择">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          CompletableFuture 入门：把串行调用并行起来
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-10-18 21:00:00" itemprop="dateCreated datePublished" datetime="2025-10-18T21:00:00+00:00">2025-10-18</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">从串行调接口的耗时切入，讲任务创建、组合、异常处理与线程池选择</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>订单详情页要展示五块数据，分别来自库存、价格、优惠券、物流、推荐五个下游接口。我写的第一个版本是老老实实一串 <code>get</code> 调下来，本地自测还行，压测时 P99 直接爆表——页面等五个接口一个接一个，等于把延迟全加在了一起。</p>
+<p>改成并行之后，接口耗时大约降了一半。这篇记录一下 <code>CompletableFuture</code> 的用法，都是当时踩过的点。</p>
+<h2 id="串行调用的问题"><a href="#串行调用的问题" class="headerlink" title="串行调用的问题"></a>串行调用的问题</h2><p>先看问题本身有多直观。假设三个互不依赖的接口，分别耗时 200ms、150ms、100ms：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">long</span> <span class="variable">t0</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line"><span class="type">String</span> <span class="variable">a</span> <span class="operator">=</span> call(<span class="string">&quot;stock&quot;</span>, <span class="number">200</span>);</span><br><span class="line"><span class="type">String</span> <span class="variable">b</span> <span class="operator">=</span> call(<span class="string">&quot;price&quot;</span>, <span class="number">150</span>);</span><br><span class="line"><span class="type">String</span> <span class="variable">c</span> <span class="operator">=</span> call(<span class="string">&quot;coupon&quot;</span>, <span class="number">100</span>);</span><br><span class="line"><span class="type">long</span> <span class="variable">t1</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line">System.out.printf(<span class="string">&quot;serial: %d ms%n&quot;</span>, t1 - t0);</span><br></pre></td></tr></table></figure>
+
+<p>我本机跑出来是 <code>serial: 456 ms</code>——接近三个数之和。它们之间没有任何依赖，本可以同时进行，却因为代码是顺序写的被硬生生串起来。这就是问题所在：<strong>代码的书写顺序，决定了调用的时序</strong>，而这五个接口本来没有先后关系。</p>
+<h2 id="用-supplyAsync-并行起来"><a href="#用-supplyAsync-并行起来" class="headerlink" title="用 supplyAsync 并行起来"></a>用 supplyAsync 并行起来</h2><p><code>CompletableFuture</code> 把”提交任务”和”拿结果”拆开了。提交时返回一个凭证（<code>CompletableFuture</code> 对象），需要结果时再 <code>get</code>：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">ExecutorService</span> <span class="variable">pool</span> <span class="operator">=</span> Executors.newFixedThreadPool(<span class="number">5</span>);   <span class="comment">// 下面再解释为什么必须自己给</span></span><br><span class="line"></span><br><span class="line"><span class="type">long</span> <span class="variable">t2</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line">CompletableFuture&lt;String&gt; fa = CompletableFuture.supplyAsync(() -&gt; call(<span class="string">&quot;stock&quot;</span>, <span class="number">200</span>), pool);</span><br><span class="line">CompletableFuture&lt;String&gt; fb = CompletableFuture.supplyAsync(() -&gt; call(<span class="string">&quot;price&quot;</span>, <span class="number">150</span>), pool);</span><br><span class="line">CompletableFuture&lt;String&gt; fc = CompletableFuture.supplyAsync(() -&gt; call(<span class="string">&quot;coupon&quot;</span>, <span class="number">100</span>), pool);</span><br><span class="line"></span><br><span class="line"><span class="type">String</span> <span class="variable">r</span> <span class="operator">=</span> fa.thenCombine(fb, (x, y) -&gt; x + <span class="string">&quot;+&quot;</span> + y)</span><br><span class="line">             .thenCombine(fc, (xy, z) -&gt; xy + <span class="string">&quot;+&quot;</span> + z)</span><br><span class="line">             .get();</span><br><span class="line"><span class="type">long</span> <span class="variable">t3</span> <span class="operator">=</span> System.currentTimeMillis();</span><br><span class="line">System.out.printf(<span class="string">&quot;parallel: %d ms -&gt; %s%n&quot;</span>, t3 - t2, r);</span><br></pre></td></tr></table></figure>
+
+<p>实测输出：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">serial:   456 ms</span><br><span class="line">parallel: 213 ms -&gt; stock-ok+price-ok+coupon-ok</span><br></pre></td></tr></table></figure>
+
+<p>213ms 接近三个里最慢的那个（200ms）再加上调度开销，而不是三者之和。这是本机单次运行的数字，不是基准测试——并行收益随下游延迟和机器波动，看数量级就行。</p>
+<p>注意这里有个不显眼的细节：<strong>池子不能小于”同一时刻要跑的任务数”。</strong> 三个任务用 3 线程当然也够；我这里写 5，是因为真实场景里订单详情页要调的是 5 个下游。如果池子比并发任务数还小，<code>supplyAsync</code> 提交的任务一样会排队，那就白并行了——所以指定池子的时候，容量要按”能同时进行的任务数”来估。</p>
+<h2 id="组合：thenCombine、thenApply、allOf"><a href="#组合：thenCombine、thenApply、allOf" class="headerlink" title="组合：thenCombine、thenApply、allOf"></a>组合：thenCombine、thenApply、allOf</h2><p>上面的例子用了 <code>thenCombine</code>，把两个 future 的结果合并成一个。常用的还有几个：</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>thenApply</code></td>
+<td>对结果做转换，返回新的值（同步式的 <code>map</code>）</td>
+</tr>
+<tr>
+<td><code>thenCompose</code></td>
+<td>拿上一个结果去发起下一个异步任务（避免嵌套 <code>CompletableFuture</code>）</td>
+</tr>
+<tr>
+<td><code>thenCombine</code></td>
+<td>等两个都完成，把两个结果合并</td>
+</tr>
+<tr>
+<td><code>thenAccept</code></td>
+<td>只要结果，不要返回值</td>
+</tr>
+<tr>
+<td><code>allOf</code></td>
+<td>等一批任务全部完成（本身返回 <code>CompletableFuture&lt;Void&gt;</code>）</td>
+</tr>
+<tr>
+<td><code>anyOf</code></td>
+<td>等其中任意一个完成</td>
+</tr>
+</tbody></table>
+<p>五个下游接口这种场景，<code>allOf</code> 最顺手：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">CompletableFuture&lt;Void&gt; all = CompletableFuture.allOf(fa, fb, fc);</span><br><span class="line">all.join();          <span class="comment">// 等全部完成；join 不抛受检异常</span></span><br><span class="line"><span class="comment">// 再各自 .join() 或 .get() 取结果</span></span><br></pre></td></tr></table></figure>
+
+<p><code>allOf</code> 的好处是它把这一组任务变成一个 future，一个 <code>join</code> 就能等齐。缺点是它返回的 <code>Void</code> 不带结果，取每个结果还是得回到各自的 future 上。</p>
+<h2 id="异常处理"><a href="#异常处理" class="headerlink" title="异常处理"></a>异常处理</h2><p>异步链条里抛异常有个陷阱：<strong>如果不处理，异常不会在提交的那行代码处冒出来</strong>，它被包在 future 里，直到你 <code>get</code> 的时候才以 <code>ExecutionException</code> 的形式抛出——有时候甚至永远不会被 <code>get</code> 到，异常就静默消失了。所以异常处理是必须显式写的。</p>
+<p>两种常用写法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 1. exceptionally：兜底，把异常转成一个默认结果</span></span><br><span class="line">CompletableFuture&lt;String&gt; f = CompletableFuture.&lt;String&gt;supplyAsync(</span><br><span class="line">        () -&gt; &#123; <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">RuntimeException</span>(<span class="string">&quot;downstream 500&quot;</span>); &#125;, pool)</span><br><span class="line">    .exceptionally(ex -&gt; <span class="string">&quot;fallback: &quot;</span> + ex.getCause().getMessage());</span><br><span class="line"></span><br><span class="line"><span class="comment">// 2. handle：无论成功失败都进，能同时拿到结果和异常</span></span><br><span class="line">CompletableFuture&lt;String&gt; g = CompletableFuture.supplyAsync(() -&gt; <span class="string">&quot;ok&quot;</span>, pool)</span><br><span class="line">    .handle((res, ex) -&gt; ex != <span class="literal">null</span> ? <span class="string">&quot;fallback&quot;</span> : res);</span><br></pre></td></tr></table></figure>
+
+<p>前者的实测输出是 <code>exceptionally: fallback: downstream 500</code>。五块数据聚合时，更实用的做法是给每个下游单独挂 <code>exceptionally</code>，某一块挂了就降级成默认值，而不是让整页 500——<strong>并行调用放大了”单点失败拖垮整体”的风险</strong>，这一点比串行时要更小心。</p>
+<h2 id="必须显式指定线程池"><a href="#必须显式指定线程池" class="headerlink" title="必须显式指定线程池"></a>必须显式指定线程池</h2><p>这是最容易被忽略、也最容易被 review 拦下来的一处。</p>
+<p><code>supplyAsync</code> 不传 <code>Executor</code> 时，用的是 <code>ForkJoinPool.commonPool()</code>。这个池子是 JVM 全局共享的，<strong>并行度默认是 CPU 核数减一</strong>（我本机 20 核，实测 <code>commonPool</code> 并行度是 19）。两个问题：</p>
+<ol>
+<li>你的下游接口调用是 IO 密集的，线程大部分时间在等网络返回。用”CPU 核数”这种为计算任务设计的池子去跑 IO，池子很快被占满，而且抢的是<strong>全应用共用</strong>的那个池——你这边堵住，会影响其他所有也在用默认池的代码。</li>
+<li>排查问题时，线程名是 <code>ForkJoinPool.commonPool-worker-*</code>，根本认不出是哪个业务发起的。用自己命名的线程池，jstack 一看就知道。</li>
+</ol>
+<p>所以：<strong><code>supplyAsync</code> &#x2F; <code>runAsync</code> 一律显式传线程池</strong>。池子大小按下游的并发能力估，IO 密集可以适当放大，但同时要留给下游一点活路——五个接口并行打过去，跟你自己串行调五次，对下游的压力完全不是一个量级，别把人家打挂了。</p>
+<h2 id="收个尾"><a href="#收个尾" class="headerlink" title="收个尾"></a>收个尾</h2><p><code>CompletableFuture</code> 真正改变的是写代码的思维方式：把”这一段要等结果”变成”先记下凭证，该汇合的时候再汇合”。从串行改并行之后，耗时从 456ms 降到 213ms，代码也确实复杂了一点——多了线程池要管、多了异常要兜。</p>
+<p>所以我的判断标准是：<strong>只有当调用之间确实没有依赖、并且延迟占比明显时，才值得并行</strong>。如果接口本身只有几毫秒，或者调用之间必须按顺序，那串行的代码更好读也更好排查——并行是把顺序的确定性换成了时间，这笔账要算清楚再换。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/CompletableFuture/" rel="tag"># CompletableFuture</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/09/13/%E5%B9%B6%E5%8F%91%E5%AE%B9%E5%99%A8%E5%85%A5%E9%97%A8-ConcurrentHashMap/" rel="prev" title="并发容器入门：ConcurrentHashMap">
+                  <i class="fa fa-angle-left"></i> 并发容器入门：ConcurrentHashMap
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/11/08/%E4%BB%80%E4%B9%88%E6%98%AF-Token-%E6%A8%A1%E5%9E%8B%E6%98%AF%E6%80%8E%E4%B9%88%E8%AF%BB%E4%BD%A0%E7%9A%84%E8%AF%9D%E7%9A%84/" rel="next" title="什么是 Token：模型是怎么读你的话的">
+                  什么是 Token：模型是怎么读你的话的 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

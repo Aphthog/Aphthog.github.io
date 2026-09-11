@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JVM · Camille</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f1ea;
+  color: #3a3028;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+.container {
+  width: 100%;
+  max-width: 780px;
+  padding: 0 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0 48px;
+}
+.site-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #d4783e;
+  text-decoration: none;
+  letter-spacing: 1.5px;
+}
+.header-nav { display: flex; gap: 20px; }
+.header-nav a {
+  font-size: 13px;
+  color: #9a8a78;
+  text-decoration: none;
+  transition: color 200ms;
+}
+.header-nav a:hover { color: #d4783e; }
+
+/* Hero */
+.hero {
+  text-align: center;
+  margin-bottom: 44px;
+  padding: 40px 0 32px;
+  border-bottom: 1px solid #e0d6c6;
+}
+.hero-title {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 24px;
+  font-weight: 400;
+  color: #3a3028;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+.hero-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b0a090;
+  letter-spacing: 0.3px;
+}
+
+.article-item {
+  display: block;
+  padding: 20px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #e0d6c6;
+}
+.article-item:last-child { border-bottom: none; }
+.article-date {
+  font-size: 12px;
+  color: #b0a090;
+  margin-bottom: 3px;
+  letter-spacing: 0.3px;
+}
+.article-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-bottom: 3px;
+  transition: color 200ms;
+}
+.article-item:hover .article-title { color: #d4783e; }
+.article-excerpt {
+  font-size: 13px;
+  color: #9a8a78;
+  line-height: 1.5;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 48px 0 24px;
+  font-size: 12px;
+  color: #c0b8a8;
+}
+
+@media (max-width: 600px) {
+  .header { padding: 14px 0 28px; }
+  .hero { padding: 24px 0 20px; }
+  .hero-title { font-size: 20px; }
+  .article-item { padding: 16px 0; }
+}
+
+/* 首页动画 */
+.home-hero {
+  text-align: center;
+  padding: 160px 0 120px;
+}
+.home-type-wrap {
+  display: inline-block;
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 32px;
+  color: #3a3028;
+  letter-spacing: 1.5px;
+  line-height: 1.5;
+}
+.home-type-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: typewriter 1.5s ease-out 0.3s forwards;
+  vertical-align: bottom;
+}
+.home-fade {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #b0a090;
+  opacity: 0;
+  animation: fadeIn 0.8s ease-out 2.5s forwards;
+}
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 600px) {
+  .home-hero { padding: 100px 0 80px; }
+  .home-type-wrap { font-size: 26px; }
+}
+
+/* Interaction effects */
+html { scroll-behavior: smooth; }
+
+.header-nav a {
+  position: relative;
+  transition: color 200ms ease;
+}
+.header-nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #d4783e;
+  transition: width 250ms ease;
+}
+.header-nav a:hover::after {
+  width: 100%;
+}
+
+.article-item {
+  transition: all 250ms ease;
+}
+.article-item:hover {
+  padding-left: 8px;
+}
+.article-title { transition: color 200ms ease; }
+
+/* 合集卡片与合集详情页 */
+
+/* 区块标题 */
+.section { margin-bottom: 44px; }
+.section-title {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-weight: 400;
+  font-size: 18px;
+  color: #3a3028;
+  margin-bottom: 20px;
+  letter-spacing: 0.5px;
+}
+
+/* 首页合集卡片（无框，和文章列表风格一致） */
+.collection-card {
+  display: block;
+  padding: 14px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #e0d6c6;
+}
+.collection-card:last-child { border-bottom: none; }
+.collection-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-bottom: 2px;
+  transition: color 200ms;
+}
+.collection-card:hover .collection-name { color: #d4783e; }
+.collection-desc {
+  font-size: 12px;
+  color: #9a8a78;
+  line-height: 1.5;
+}
+.collection-count {
+  font-size: 12px;
+  color: #d4783e;
+  margin-top: 6px;
+}
+
+/* 合集展开/收缩 */
+.collection-group { margin-bottom: 28px; }
+.collection-group:last-child { margin-bottom: 0; }
+.group-title {
+  font-size: 12px;
+  color: #b0a090;
+  letter-spacing: 1.2px;
+  margin-bottom: 14px;
+}
+
+.co-details:last-of-type { border-bottom: none; }
+
+.co-summary {
+  display: flex;
+  align-items: center;
+  padding: 14px 0;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: color 200ms;
+}
+.co-summary:hover { color: #d4783e; }
+.co-summary::-webkit-details-marker { display: none; }
+
+.co-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: #3a3028;
+}
+.co-details[open] .co-name { color: #d4783e; }
+.co-count {
+  font-size: 12px;
+  color: #b0a090;
+  margin-right: 6px;
+}
+.co-arrow {
+  font-size: 12px;
+  color: #b0a090;
+  transition: transform 200ms;
+}
+.co-details[open] .co-arrow { transform: rotate(90deg); }
+
+.co-articles { padding: 0; }
+.co-articles .article-item {
+  padding: 12px 0 12px 16px;
+}
+.co-articles .article-date {
+  font-size: 12px;
+  color: #b0a090;
+  letter-spacing: 0.3px;
+}
+.co-articles .article-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-top: 2px;
+  transition: color 200ms;
+}
+.co-articles .article-item:hover .article-title { color: #d4783e; }
+.co-articles .article-excerpt {
+  font-size: 12px;
+  color: #9a8a78;
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.co-empty {
+  padding: 14px 14px 14px 16px;
+  font-size: 13px;
+  color: #b0a090;
+}
+
+/* 合集详情页 */
+.back-link {
+  display: inline-block;
+  font-size: 13px;
+  color: #9a8a78;
+  text-decoration: none;
+  margin-bottom: 18px;
+  transition: color 200ms;
+}
+.back-link:hover { color: #d4783e; }
+.collection-head {
+  padding: 4px 0 26px;
+  border-bottom: 1px solid #e0d6c6;
+  margin-bottom: 4px;
+}
+.collection-head h1 {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-weight: 400;
+  font-size: 22px;
+  color: #3a3028;
+}
+.collection-head p {
+  font-size: 13px;
+  color: #9a8a78;
+  margin-top: 6px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <header class="header">
+  <a href="/" class="site-name">Camille</a>
+  <nav class="header-nav">
+    <a href="/">首页</a>
+    <a href="/collections/">合集</a>
+    <a href="/categories/">分类</a>
+    <a href="/archives/">归档</a>
+    <a href="/about/">关于</a>
+  </nav>
+</header>
+
+
+  <a class="back-link" href="/collections/">← 全部合集</a>
+
+  <div class="collection-head">
+    <h1>JVM</h1>
+    <p>内存结构、垃圾回收、类加载，以及一次 OOM 排查（共 4 篇）</p>
+  </div>
+
+  
+  <a class="article-item" href="/2026/02/14/一次OOM排查记录/">
+    <div class="article-date">Feb 14</div>
+    <div class="article-title">一次 OOM 排查记录</div>
+    <div class="article-excerpt">服务跑一夜 OOM 的排查：dump、MAT 支配树定位、本地缓存淘汰缺失修复</div>
+  </a>
+  
+  <a class="article-item" href="/2026/01/17/类加载机制入门/">
+    <div class="article-date">Jan 17</div>
+    <div class="article-title">类加载机制入门</div>
+    <div class="article-excerpt">类加载的七个阶段，准备与初始化的区别，双亲委派模型及其意义</div>
+  </a>
+  
+  <a class="article-item" href="/2025/12/20/垃圾回收入门-从GC-Roots说起/">
+    <div class="article-date">Dec 20</div>
+    <div class="article-title">垃圾回收入门：从 GC Roots 说起</div>
+    <div class="article-excerpt">引用计数缺陷、可达性分析、GC Roots 类型，分代假设与四种收集器概览</div>
+  </a>
+  
+  <a class="article-item" href="/2025/11/22/JVM-内存结构入门/">
+    <div class="article-date">Nov 22</div>
+    <div class="article-title">JVM 内存结构入门</div>
+    <div class="article-excerpt">运行时数据区五块的内存划分，线程私有与共享，堆的分代结构</div>
+  </a>
+  
+
+  <div class="footer">© 2026 Camille</div>
+
+
+</div>
+
+</body>
+</html>

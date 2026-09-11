@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="Redis惰性删除与定期删除的配合及八种淘汰策略的取舍">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis 过期策略与内存淘汰">
+<meta property="og:url" content="https://aphthog.github.io/2026/08/22/Redis-%E8%BF%87%E6%9C%9F%E7%AD%96%E7%95%A5%E4%B8%8E%E5%86%85%E5%AD%98%E6%B7%98%E6%B1%B0/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="Redis惰性删除与定期删除的配合及八种淘汰策略的取舍">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-08-22T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.400Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="内存">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/08/22/Redis-%E8%BF%87%E6%9C%9F%E7%AD%96%E7%95%A5%E4%B8%8E%E5%86%85%E5%AD%98%E6%B7%98%E6%B1%B0/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/08/22/Redis-%E8%BF%87%E6%9C%9F%E7%AD%96%E7%95%A5%E4%B8%8E%E5%86%85%E5%AD%98%E6%B7%98%E6%B1%B0/","path":"2026/08/22/Redis-过期策略与内存淘汰/","title":"Redis 过期策略与内存淘汰"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis 过期策略与内存淘汰 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/08/22/Redis-%E8%BF%87%E6%9C%9F%E7%AD%96%E7%95%A5%E4%B8%8E%E5%86%85%E5%AD%98%E6%B7%98%E6%B1%B0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis 过期策略与内存淘汰 | Camille">
+      <meta itemprop="description" content="Redis惰性删除与定期删除的配合及八种淘汰策略的取舍">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis 过期策略与内存淘汰
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-08-22 21:00:00" itemprop="dateCreated datePublished" datetime="2026-08-22T21:00:00+00:00">2026-08-22</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">Redis惰性删除与定期删除的配合及八种淘汰策略的取舍</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>项目上线两个月，Redis 内存满了，新的写入全部报错。我一脸懵地去看——给每个 key 都设了过期时间，为什么内存还是爆了？</p>
+<p>后来才明白，给 key 设过期时间不代表到时它就会被”删掉”。Redis 的删除机制有两层：过期策略管”到期的 key 怎么删”；淘汰策略管”内存不够了怎么腾空间”。两者是两回事，混在一起想容易出问题。</p>
+<h2 id="过期策略：惰性删除-定期删除"><a href="#过期策略：惰性删除-定期删除" class="headerlink" title="过期策略：惰性删除 + 定期删除"></a>过期策略：惰性删除 + 定期删除</h2><p><strong>惰性删除</strong>：每次访问 key 的时候，检查它是否已过期，过期就删掉再返回空。这是被动策略——如果一个 key 过期后没再被访问，它就赖在内存里不走。</p>
+<p><strong>定期删除</strong>：Redis 每隔 100 毫秒左右，从设置了过期时间的 key 集合里随机抽一批检查，过期就删。不是扫描全部 key——全扫的话几百万 key 要卡很久。每次只抽一小部分（默认 20 个），如果过期比例超过 25%，就再抽一轮。</p>
+<p>两者配合下来，大部分过期 key 能在合理时间内被清理。但明显有一个漏洞：大量 key 同时过期后不再被访问，惰性删除碰不到它们，定期删除又只抽一小部分。这些 key 就会一直在内存里占着位置。这就是我当初踩的坑——key 过期了不代表内存会立刻腾出来。</p>
+<h2 id="内存淘汰：八种策略"><a href="#内存淘汰：八种策略" class="headerlink" title="内存淘汰：八种策略"></a>内存淘汰：八种策略</h2><p>当 <code>maxmemory</code> 达到上限后，Redis 不会坐以待毙，而是按配置的淘汰策略决定踢哪些 key 出去。Redis 提供了八种策略，从简单到精细：</p>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th>淘汰范围</th>
+<th>淘汰方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>noeviction</td>
+<td>不淘汰</td>
+<td>写入直接报错</td>
+</tr>
+<tr>
+<td>allkeys-lru</td>
+<td>所有 key</td>
+<td>淘汰最近最少使用的</td>
+</tr>
+<tr>
+<td>allkeys-lfu</td>
+<td>所有 key</td>
+<td>淘汰最不经常使用的</td>
+</tr>
+<tr>
+<td>allkeys-random</td>
+<td>所有 key</td>
+<td>随机淘汰</td>
+</tr>
+<tr>
+<td>volatile-lru</td>
+<td>设置了过期时间的 key</td>
+<td>淘汰最近最少使用的</td>
+</tr>
+<tr>
+<td>volatile-lfu</td>
+<td>设置了过期时间的 key</td>
+<td>淘汰最不经常使用的</td>
+</tr>
+<tr>
+<td>volatile-random</td>
+<td>设置了过期时间的 key</td>
+<td>随机淘汰</td>
+</tr>
+<tr>
+<td>volatile-ttl</td>
+<td>设置了过期时间的 key</td>
+<td>淘汰剩余 TTL 最短的</td>
+</tr>
+</tbody></table>
+<p>最常用的两个是 <code>allkeys-lru</code> 和 <code>volatile-lru</code>，它们的差别一句话讲清楚：如果所有 key 都设了过期时间，两个表现一样；如果有的 key 没设过期时间（比如存配置或永不过期的数据），<code>volatile-lru</code> 永远不会淘汰这些无过期 key，而 <code>allkeys-lru</code> 会一视同仁。</p>
+<p>一般场景推荐 <code>allkeys-lru</code>，你在 Redis 里存的数据大概率都是”丢了不可惜”的缓存，不需要照顾谁。如果有类似”业务配置永不过期”的 key 想保护，才用 <code>volatile-lru</code>。</p>
+<p>LRU 和 LFU 的差别：LRU 看最近一次访问时间，一个 key 刚被访问过就进入”热”区；LFU 看访问频率，一个 key 过去一小时被高频访问但最近几秒没碰，LFU 仍认为它重要。对周期性波动的业务（比如饭点的外卖热点），LFU 可能更准。</p>
+<h2 id="maxmemory-该怎么配"><a href="#maxmemory-该怎么配" class="headerlink" title="maxmemory 该怎么配"></a>maxmemory 该怎么配</h2><p>默认 64 位系统 <code>maxmemory</code> 为 0（不限制）。如果只是实验环境没问题，但在生产环境一定要配。配多大？</p>
+<p>建议是：<strong>留出 20–30% 的内存给 Redis 自身和操作系统</strong>。比如服务器有 8GB 内存，Redis 的 <code>maxmemory</code> 设 4–6GB。不设那么满的原因有好几个：</p>
+<ul>
+<li>主从复制需要 replication backlog（默认 1MB，大流量时可能要更大）</li>
+<li>AOF 重写和 BGSAVE 需要 fork 子进程，fork 期间 copy-on-write 会额外耗内存</li>
+<li>操作系统本身也需要内存做文件缓存</li>
+</ul>
+<p>一般来说 <code>maxmemory-policy</code> 配 <code>allkeys-lru</code>，<code>maxmemory</code> 留余量，这个组合覆盖了 80% 的业务场景。</p>
+<h2 id="排查思路：”内存莫名满了”怎么办"><a href="#排查思路：”内存莫名满了”怎么办" class="headerlink" title="排查思路：”内存莫名满了”怎么办"></a>排查思路：”内存莫名满了”怎么办</h2><p>遇到 Redis 内存涨得异常快，可以按这几步摸一下：</p>
+<ol>
+<li><p><strong><code>redis-cli --bigkeys</code></strong>：扫描全库，按类型统计最大的 key。常见情况是某个 Hash 或 ZSet 被塞了太多数据没控制，或者 List 做了消息队列没有及时消费。但注意这个命令对线上有性能开销，建议在低峰期跑。</p>
+</li>
+<li><p><strong><code>MEMORY USAGE &lt;key&gt;</code></strong>：查看某个 key 实际占了多少字节。有时候你以为存的只是一个小字符串，但 SDS 加上过期时间等元数据开销可能比你预想的大。</p>
+</li>
+<li><p><strong>检查过期时间</strong>：<code>redis-cli -c -h &lt;host&gt; --scan --pattern &#39;*&#39; | xargs -I {} redis-cli TTL {}</code> 统计全库 key 的 TTL，如果大量 key 的 TTL 设为 -1（永不过期），说明代码里有些 key 忘记设过期时间了。</p>
+</li>
+<li><p><strong>查业务日志</strong>：某个 key 来源的业务是否在最坏情况下产生数据量远超预期——缓存了一条”用户的所有操作记录”结果用户操作了上万次。</p>
+</li>
+</ol>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>过期策略管的是”时间到了怎么删”，淘汰策略管的是”空间不够了踢谁”。后者是保命用的。配好 <code>maxmemory</code> 和 <code>maxmemory-policy</code>，再配合 <code>--bigkeys</code> 定期巡检，Redis 的内存问题大部分能提前发现。别等到 OOM 了再去看——到那时 Redis 可能已经开始拒绝写入了。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%86%85%E5%AD%98/" rel="tag"># 内存</a>
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/08/08/%E5%88%86%E5%B8%83%E5%BC%8F%E9%94%81%E5%85%A5%E9%97%A8-%E4%BB%8ESETNX%E8%AF%B4%E8%B5%B7/" rel="prev" title="分布式锁入门：从 SETNX 说起">
+                  <i class="fa fa-angle-left"></i> 分布式锁入门：从 SETNX 说起
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/08/29/%E9%AB%98%E5%B9%B6%E5%8F%91%E6%8B%BC%E5%9B%A2%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%E6%8B%86%E8%A7%A3-%E4%B8%80-%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88%E4%B8%8E%E9%A2%86%E5%9F%9F%E5%88%86%E5%9F%9F/" rel="next" title="高并发拼团交易系统拆解（一）：架构总览与领域分域">
+                  高并发拼团交易系统拆解（一）：架构总览与领域分域 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

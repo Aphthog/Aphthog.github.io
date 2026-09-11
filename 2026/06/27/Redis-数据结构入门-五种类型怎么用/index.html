@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="String&#x2F;Hash&#x2F;List&#x2F;Set&#x2F;ZSet的典型用途与选型建议">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis 数据结构入门：五种类型怎么用">
+<meta property="og:url" content="https://aphthog.github.io/2026/06/27/Redis-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%85%A5%E9%97%A8-%E4%BA%94%E7%A7%8D%E7%B1%BB%E5%9E%8B%E6%80%8E%E4%B9%88%E7%94%A8/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="String&#x2F;Hash&#x2F;List&#x2F;Set&#x2F;ZSet的典型用途与选型建议">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-06-27T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.400Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Redis">
+<meta property="article:tag" content="数据结构">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/06/27/Redis-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%85%A5%E9%97%A8-%E4%BA%94%E7%A7%8D%E7%B1%BB%E5%9E%8B%E6%80%8E%E4%B9%88%E7%94%A8/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/06/27/Redis-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%85%A5%E9%97%A8-%E4%BA%94%E7%A7%8D%E7%B1%BB%E5%9E%8B%E6%80%8E%E4%B9%88%E7%94%A8/","path":"2026/06/27/Redis-数据结构入门-五种类型怎么用/","title":"Redis 数据结构入门：五种类型怎么用"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Redis 数据结构入门：五种类型怎么用 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/06/27/Redis-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%85%A5%E9%97%A8-%E4%BA%94%E7%A7%8D%E7%B1%BB%E5%9E%8B%E6%80%8E%E4%B9%88%E7%94%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Redis 数据结构入门：五种类型怎么用 | Camille">
+      <meta itemprop="description" content="String&#x2F;Hash&#x2F;List&#x2F;Set&#x2F;ZSet的典型用途与选型建议">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Redis 数据结构入门：五种类型怎么用
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-06-27 21:00:00" itemprop="dateCreated datePublished" datetime="2026-06-27T21:00:00+00:00">2026-06-27</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">String/Hash/List/Set/ZSet的典型用途与选型建议</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>面试被问过一个问题：Redis 五种数据类型，你怎么选？</p>
+<p>第一次用 Redis 的时候，我只知道 <code>SET</code> 和 <code>GET</code>，所有数据不管长什么样都序列化成 String 往里面塞。后来项目大了，出过几件事——一个用户信息缓存用 String 存 JSON，要改一个字段就得全量读写；一个排行榜需求让同事用 List 排序，性能惨不忍睹。这些坑告诉我，选对类型比用对命令重要得多。</p>
+<h2 id="String-——-最通用但别乱用"><a href="#String-——-最通用但别乱用" class="headerlink" title="String —— 最通用但别乱用"></a>String —— 最通用但别乱用</h2><p>String 是 Redis 最基础的类型，value 最大 512MB。典型场景：</p>
+<ul>
+<li><strong>缓存 HTML 片段</strong>或序列化后的对象</li>
+<li><strong>计数器</strong>：<code>INCR</code> 做文章阅读数、点赞数，一条命令搞定且是原子的</li>
+<li><strong>分布式 session</strong>：<code>SET session:token user_id NX PX 3600</code></li>
+</ul>
+<p>底层的 SDS（Simple Dynamic String）存了一个长度字段，取长度是 O(1) 的。但把对象整个序列化存成 String，读出来反序列化、改一个字段再整个写回去，代价大而且容易出并发覆盖。</p>
+<h2 id="Hash-——-存对象的更好选择"><a href="#Hash-——-存对象的更好选择" class="headerlink" title="Hash —— 存对象的更好选择"></a>Hash —— 存对象的更好选择</h2><p>一个 Hash 相当于一个 field-value 的小字典：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">HSET user:1001 name &quot;张三&quot; age 25 city &quot;重庆&quot;</span><br><span class="line">HGET user:1001 name</span><br><span class="line">HINCRBY user:1001 age 1</span><br></pre></td></tr></table></figure>
+
+<p>存用户信息、商品详情这种多个字段的对象，用 Hash 比用 String 存 JSON 灵活得多：只改一个字段只传输一个 field，不用全量读写。原子性也更好——<code>HINCRBY</code> 对计数器字段能直接操作。</p>
+<p><strong>选型建议</strong>：字段少且固定（比如配置项、地址簿），Hash 更合适。字段很多但每次都要读全量（比如文章正文），String 序列化反而省事，因为 Hash 的底层是哈希表，field 多了有内存开销。</p>
+<h2 id="List-——-队列和栈"><a href="#List-——-队列和栈" class="headerlink" title="List —— 队列和栈"></a>List —— 队列和栈</h2><p>List 底层是双向链表或压缩列表（数据量小的时候），支持两端操作：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">LPUSH queue task:1</span><br><span class="line">RPOP queue</span><br><span class="line">LLEN queue</span><br></pre></td></tr></table></figure>
+
+<p>可以用来实现简单的消息队列（LPUSH + BRPOP 做阻塞消费），或者时间线展示——比如用户的最近动态用 <code>LPUSH</code> 加到列表头，<code>LTRIM</code> 只保留最新的 100 条。</p>
+<h2 id="Set-——-去重和集合运算"><a href="#Set-——-去重和集合运算" class="headerlink" title="Set —— 去重和集合运算"></a>Set —— 去重和集合运算</h2><p>Set 存的是不重复的字符串，底层是哈希表：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">SADD tags:post:1 &quot;Java&quot; &quot;Redis&quot; &quot;缓存&quot;</span><br><span class="line">SMEMBERS tags:post:1</span><br><span class="line">SISMEMBER tags:post:1 &quot;Redis&quot;  // O(1) 判断</span><br></pre></td></tr></table></figure>
+
+<p>集合运算对业务逻辑很有用——<code>SINTER</code> 取交集可以算”同时关注两个博主的用户”，<code>SUNION</code> 做并集可以合并两份黑名单。</p>
+<h2 id="ZSet-——-有排序的集合"><a href="#ZSet-——-有排序的集合" class="headerlink" title="ZSet —— 有排序的集合"></a>ZSet —— 有排序的集合</h2><p>ZSet 每个元素带一个 score，按 score 排序。底层用跳表（多层索引，近似二分查找）和哈希表组合实现，兼顾排序和单点查询。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">ZADD leaderboard 100 &quot;user1&quot;</span><br><span class="line">ZADD leaderboard 200 &quot;user2&quot;</span><br><span class="line">ZADD leaderboard 150 &quot;user3&quot;</span><br><span class="line">ZREVRANGE leaderboard 0 2 WITHSCORES  // 取前三名</span><br><span class="line">ZINCRBY leaderboard 10 &quot;user2&quot;        // 加分</span><br></pre></td></tr></table></figure>
+
+<p>排行榜是 ZSet 的杀手级场景：游戏积分榜、文章热度榜。<code>ZREVRANGE</code> 取 Top N，<code>ZRANK</code> 查自己的排名，全都能在 O(logN) 完成。用别的类型做这个功能基本都要配合外部排序，麻烦很多。</p>
+<h2 id="底层结构一句话"><a href="#底层结构一句话" class="headerlink" title="底层结构一句话"></a>底层结构一句话</h2><p>每种类型背后有对应的编码方式，不同数据量下自动切换：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>底层结构</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>String</td>
+<td>SDS</td>
+<td>存长度字段，取长度 O(1)，append 不每次都 realloc</td>
+</tr>
+<tr>
+<td>Hash</td>
+<td>压缩列表 &#x2F; 哈希表</td>
+<td>小数据用连续内存块，大了转哈希表</td>
+</tr>
+<tr>
+<td>List</td>
+<td>压缩列表 &#x2F; 双向链表</td>
+<td>小数据压缩存储，大了转为链表</td>
+</tr>
+<tr>
+<td>Set</td>
+<td>整数集合 &#x2F; 哈希表</td>
+<td>全是整数时用紧凑的整数集合</td>
+</tr>
+<tr>
+<td>ZSet</td>
+<td>压缩列表 &#x2F; 跳表</td>
+<td>跳表多层索引，近似二分查找</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>底层结构可以在配置项里看到：<code>redis-cli OBJECT ENCODING &lt;key&gt;</code>。</p>
+</blockquote>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>选 Redis 类型其实就是想清楚你的<strong>数据结构</strong>和<strong>访问模式</strong>。计数器用 String，对象用 Hash，队列用 List，标签去重用 Set，排行榜用 ZSet。面试答”我会先看数据的访问特征再选”比背八股管用得多。实际项目里，选错了类型最直接的后果就是内存多几百 MB，改起来倒也不难——但一开始选对，省掉后续优化成本。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Redis/" rel="tag"># Redis</a>
+              <a href="/tags/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/" rel="tag"># 数据结构</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/06/13/%E4%B8%80%E6%AC%A1%E6%85%A2%E6%9F%A5%E8%AF%A2%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/" rel="prev" title="一次慢查询优化实践">
+                  <i class="fa fa-angle-left"></i> 一次慢查询优化实践
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/11/%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F-%E5%87%BB%E7%A9%BF-%E9%9B%AA%E5%B4%A9-%E4%B8%89%E4%B8%AA%E5%B8%B8%E8%A2%AB%E5%BF%B5%E9%94%99%E7%9A%84%E5%90%8D%E8%AF%8D/" rel="next" title="缓存穿透、击穿、雪崩：三个常被念错的名词">
+                  缓存穿透、击穿、雪崩：三个常被念错的名词 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="行锁间隙锁临键锁区别，两条UPDATE加锁顺序相反的死锁实例与减少死锁实践">
+<meta property="og:type" content="article">
+<meta property="og:title" content="加锁分析：间隙锁与死锁">
+<meta property="og:url" content="https://aphthog.github.io/2026/05/16/%E5%8A%A0%E9%94%81%E5%88%86%E6%9E%90-%E9%97%B4%E9%9A%99%E9%94%81%E4%B8%8E%E6%AD%BB%E9%94%81/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="行锁间隙锁临键锁区别，两条UPDATE加锁顺序相反的死锁实例与减少死锁实践">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-05-16T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.401Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="死锁">
+<meta property="article:tag" content="锁">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/05/16/%E5%8A%A0%E9%94%81%E5%88%86%E6%9E%90-%E9%97%B4%E9%9A%99%E9%94%81%E4%B8%8E%E6%AD%BB%E9%94%81/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/05/16/%E5%8A%A0%E9%94%81%E5%88%86%E6%9E%90-%E9%97%B4%E9%9A%99%E9%94%81%E4%B8%8E%E6%AD%BB%E9%94%81/","path":"2026/05/16/加锁分析-间隙锁与死锁/","title":"加锁分析：间隙锁与死锁"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>加锁分析：间隙锁与死锁 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/05/16/%E5%8A%A0%E9%94%81%E5%88%86%E6%9E%90-%E9%97%B4%E9%9A%99%E9%94%81%E4%B8%8E%E6%AD%BB%E9%94%81/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="加锁分析：间隙锁与死锁 | Camille">
+      <meta itemprop="description" content="行锁间隙锁临键锁区别，两条UPDATE加锁顺序相反的死锁实例与减少死锁实践">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          加锁分析：间隙锁与死锁
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-05-16 21:00:00" itemprop="dateCreated datePublished" datetime="2026-05-16T21:00:00+00:00">2026-05-16</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">行锁间隙锁临键锁区别，两条UPDATE加锁顺序相反的死锁实例与减少死锁实践</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>第一次在线上遇到死锁是接手一个活动系统的计数器表。日志里有一条 <code>Deadlock found when trying to get lock; try restarting transaction</code>，我当时的第一反应是”我都没用显式锁，哪来的死锁？”后来才知道，InnoDB 的行锁和间隙锁在某些 SQL 下会自动触发加锁——你甚至没意识到它加了锁，死锁就已经发生了。</p>
+<h2 id="三种锁的区别"><a href="#三种锁的区别" class="headerlink" title="三种锁的区别"></a>三种锁的区别</h2><p>InnoDB 的锁不是一种，而是三种，用在不同场景。</p>
+<p><strong>行锁（Record Lock）</strong>：锁住索引上的某一条记录。<code>SELECT * FROM t WHERE id = 1 FOR UPDATE</code> 就是行锁。注意 InnoDB 的行锁是基于索引实现的——如果 WHERE 条件没有走索引，行锁会升级为表锁（实际上是锁住所有聚簇索引记录，效果等同于表锁）。</p>
+<p><strong>间隙锁（Gap Lock）</strong>：锁住两条记录之间的空隙。目的是阻止其他事务在这个间隙插入新记录。间隙锁只在 RR 隔离级别下生效，RC 下不会有间隙锁——这也是为什么很多团队把隔离级别降到 RC 来减少锁冲突。</p>
+<p><strong>临键锁（Next-Key Lock）</strong>：行锁 + 间隙锁的组合。锁住一个左开右闭的区间 <code>(a, b]</code>。InnoDB 在 RR 级别下默认加的就是临键锁——既锁住行，也锁住间隙，防止其他事务在之间插入。</p>
+<p>举个例子，表里有 id 为 1、3、5 三行：</p>
+<ul>
+<li>id &#x3D; 2 的间隙锁：锁范围 <code>(1, 3)</code>，阻止插入 id &#x3D; 2</li>
+<li>id &#x3D; 3 的临键锁：锁范围 <code>(1, 3]</code>，阻止插入 id &#x3D; 2 和修改 id &#x3D; 3</li>
+<li>id &#x3D; 5 的临键锁：锁范围 <code>(3, 5]</code></li>
+</ul>
+<p>间隙锁的本质是解决幻读：如果事务 A <code>SELECT * FROM t WHERE id &gt; 1 FOR UPDATE</code> 查到了 3 和 5，没有间隙锁的话，事务 B 插入 id &#x3D; 2，事务 A 再查一遍就多了一行——这就是幻读。</p>
+<h2 id="两条-UPDATE-死锁的实例"><a href="#两条-UPDATE-死锁的实例" class="headerlink" title="两条 UPDATE 死锁的实例"></a>两条 UPDATE 死锁的实例</h2><p>死锁最常见的原因是两个事务以相反的加锁顺序访问同一组资源。下面是一个实际能触发死锁的场景：</p>
+<p>表结构：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">CREATE TABLE</span> `inventory` (</span><br><span class="line">  `id` <span class="type">int</span> <span class="keyword">NOT NULL</span>,</span><br><span class="line">  `sku` <span class="type">varchar</span>(<span class="number">20</span>) <span class="keyword">NOT NULL</span>,</span><br><span class="line">  `stock` <span class="type">int</span> <span class="keyword">DEFAULT</span> <span class="number">0</span>,</span><br><span class="line">  <span class="keyword">PRIMARY KEY</span> (`id`),</span><br><span class="line">  KEY `idx_sku` (`sku`)</span><br><span class="line">) ENGINE<span class="operator">=</span>InnoDB;</span><br></pre></td></tr></table></figure>
+
+<p>数据：<code>(1, &#39;sku_a&#39;, 100)</code>、<code>(2, &#39;sku_b&#39;, 100)</code>。</p>
+<p>事务 A：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">START</span> TRANSACTION;</span><br><span class="line"><span class="keyword">UPDATE</span> inventory <span class="keyword">SET</span> stock <span class="operator">=</span> stock <span class="operator">-</span> <span class="number">1</span> <span class="keyword">WHERE</span> sku <span class="operator">=</span> <span class="string">&#x27;sku_a&#x27;</span>;</span><br><span class="line"><span class="comment">-- 然后做其他事</span></span><br><span class="line"><span class="keyword">UPDATE</span> inventory <span class="keyword">SET</span> stock <span class="operator">=</span> stock <span class="operator">-</span> <span class="number">1</span> <span class="keyword">WHERE</span> sku <span class="operator">=</span> <span class="string">&#x27;sku_b&#x27;</span>;</span><br><span class="line"><span class="keyword">COMMIT</span>;</span><br></pre></td></tr></table></figure>
+
+<p>事务 B：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">START</span> TRANSACTION;</span><br><span class="line"><span class="keyword">UPDATE</span> inventory <span class="keyword">SET</span> stock <span class="operator">=</span> stock <span class="operator">-</span> <span class="number">1</span> <span class="keyword">WHERE</span> sku <span class="operator">=</span> <span class="string">&#x27;sku_b&#x27;</span>;</span><br><span class="line"><span class="comment">-- 然后做其他事</span></span><br><span class="line"><span class="keyword">UPDATE</span> inventory <span class="keyword">SET</span> stock <span class="operator">=</span> stock <span class="operator">-</span> <span class="number">1</span> <span class="keyword">WHERE</span> sku <span class="operator">=</span> <span class="string">&#x27;sku_a&#x27;</span>;</span><br><span class="line"><span class="keyword">COMMIT</span>;</span><br></pre></td></tr></table></figure>
+
+<p>如果两个事务同时执行：A 锁了 sku_a，B 锁了 sku_b。然后 A 等 B 释放 sku_b，B 等 A 释放 sku_a——死锁。InnoDB 的死锁检测器会检测到这个循环等待，立即回滚其中一个事务（一般是锁得少的一方），并返回：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction</span><br></pre></td></tr></table></figure>
+
+<p>注意这是个真实能复现的例子——两条 UPDATE 在 RR 下对二级索引 sku 加临键锁，两个事务的加锁顺序相反，必然触发死锁。</p>
+<h2 id="减少死锁的实践"><a href="#减少死锁的实践" class="headerlink" title="减少死锁的实践"></a>减少死锁的实践</h2><p>经历几次死锁之后，我总结了三条做法：</p>
+<p><strong>1. 固定加锁顺序。</strong> 就像上面的例子，如果约定所有事务都先锁 sku_a 再锁 sku_b，就不会出现循环等待。代码层面可以让 sku 排序后依次处理。</p>
+<p><strong>2. 缩短事务时间。</strong> 死锁的窗口期跟事务持续时间直接相关。不要在事务里做 HTTP 调用、复杂计算或者等待用户输入。从操作数据库到 COMMIT，越快越好。</p>
+<p><strong>3. 避免无索引更新。</strong> 如果 <code>WHERE</code> 条件没有走索引，InnoDB 会锁住聚簇索引的所有记录（效果相当于表锁）。锁的范围越大，死锁概率越高。保证 <code>UPDATE</code> 和 <code>DELETE</code> 的 WHERE 条件走索引，把锁的范围降到最小。</p>
+<p>另外，线上设置 <code>innodb_lock_wait_timeout</code>（默认 50 秒）不要开太大。死锁发生时，等待 50 秒才报错和 1 秒就报错，影响面完全不同。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>大多数死锁不是程序逻辑有问题，而是两个事务对资源加锁的路径产生了交叉。理解行锁、间隙锁、临键锁的区别，知道什么 SQL 加了什么锁，写代码的时候就能有意识地避免加锁顺序的冲突。遇到死锁报错别慌，看日志里两个事务的 SQL，找出锁冲突的路径，固定顺序就行了。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/%E9%94%81/" rel="tag"># 锁</a>
+              <a href="/tags/%E6%AD%BB%E9%94%81/" rel="tag"># 死锁</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/05/15/RAG-%E6%9C%8D%E5%8A%A1%E6%90%AD%E5%BB%BA%E8%AE%B0%E5%BD%95-%E5%9B%9B-%E8%B8%A9%E5%9D%91%E8%AE%B0/" rel="prev" title="RAG 服务搭建记录（四）：踩坑记">
+                  <i class="fa fa-angle-left"></i> RAG 服务搭建记录（四）：踩坑记
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/05/23/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B%E5%85%A5%E9%97%A8-Agent-%E7%9A%84%E8%AE%B0%E5%BF%86%E8%AF%A5%E6%80%8E%E4%B9%88%E8%AE%BE%E8%AE%A1/" rel="next" title="上下文工程入门：Agent 的记忆该怎么设计">
+                  上下文工程入门：Agent 的记忆该怎么设计 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

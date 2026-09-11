@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从 i++ 少加讲起，拆开原子性、可见性与有序性三类并发问题及对策">
+<meta property="og:type" content="article">
+<meta property="og:title" content="线程安全的三类问题：原子性、可见性、有序性">
+<meta property="og:url" content="https://aphthog.github.io/2025/06/14/%E7%BA%BF%E7%A8%8B%E5%AE%89%E5%85%A8%E7%9A%84%E4%B8%89%E7%B1%BB%E9%97%AE%E9%A2%98-%E5%8E%9F%E5%AD%90%E6%80%A7-%E5%8F%AF%E8%A7%81%E6%80%A7-%E6%9C%89%E5%BA%8F%E6%80%A7/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="从 i++ 少加讲起，拆开原子性、可见性与有序性三类并发问题及对策">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-06-14T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.401Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="JMM">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/06/14/%E7%BA%BF%E7%A8%8B%E5%AE%89%E5%85%A8%E7%9A%84%E4%B8%89%E7%B1%BB%E9%97%AE%E9%A2%98-%E5%8E%9F%E5%AD%90%E6%80%A7-%E5%8F%AF%E8%A7%81%E6%80%A7-%E6%9C%89%E5%BA%8F%E6%80%A7/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/06/14/%E7%BA%BF%E7%A8%8B%E5%AE%89%E5%85%A8%E7%9A%84%E4%B8%89%E7%B1%BB%E9%97%AE%E9%A2%98-%E5%8E%9F%E5%AD%90%E6%80%A7-%E5%8F%AF%E8%A7%81%E6%80%A7-%E6%9C%89%E5%BA%8F%E6%80%A7/","path":"2025/06/14/线程安全的三类问题-原子性-可见性-有序性/","title":"线程安全的三类问题：原子性、可见性、有序性"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>线程安全的三类问题：原子性、可见性、有序性 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/06/14/%E7%BA%BF%E7%A8%8B%E5%AE%89%E5%85%A8%E7%9A%84%E4%B8%89%E7%B1%BB%E9%97%AE%E9%A2%98-%E5%8E%9F%E5%AD%90%E6%80%A7-%E5%8F%AF%E8%A7%81%E6%80%A7-%E6%9C%89%E5%BA%8F%E6%80%A7/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="线程安全的三类问题：原子性、可见性、有序性 | Camille">
+      <meta itemprop="description" content="从 i++ 少加讲起，拆开原子性、可见性与有序性三类并发问题及对策">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          线程安全的三类问题：原子性、可见性、有序性
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-06-14 21:00:00" itemprop="dateCreated datePublished" datetime="2025-06-14T21:00:00+00:00">2025-06-14</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">从 i++ 少加讲起，拆开原子性、可见性与有序性三类并发问题及对策</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>有段时间我在做一个定时统计任务，逻辑很简单：四个线程分头处理数据，每处理一条就给一个计数器 <code>count++</code>，最后把 <code>count</code> 打出来。上线后发现这个数字平时少一点也就算了，有几次少了将近一半。</p>
+<p>我第一反应是数据源有问题，查了半天，最后被同事一句话点醒：”你这个 <code>count</code>，多线程下这么加是不对的。”后来才知道，<code>i++</code> 这种我闭着眼睛写的语句，藏着并发编程里最基础的坑。这篇把当时搞清楚的三个概念记一下——原子性、可见性、有序性。</p>
+<h2 id="原子性：i-不是一步"><a href="#原子性：i-不是一步" class="headerlink" title="原子性：i++ 不是一步"></a>原子性：i++ 不是一步</h2><p>代码里 <code>count++</code> 看起来是一步，CPU 执行起来其实是三步：<strong>读</strong>出 <code>count</code> 的值到寄存器，<strong>改</strong>成加一，<strong>写</strong>回内存。</p>
+<p>多线程下问题就出在”读”和”写”之间。假设 <code>count</code> 是 5，线程 A 读到 5，还没写回；线程 B 也读到 5，也算出 6 写回去；然后 A 才把 6 写回。两次加一，结果只涨了 1。这就是我那个统计任务少数据的来路。</p>
+<p>要验证这一点，写个十几行就够（我本机是 JDK 17）：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="type">int</span> <span class="variable">plain</span> <span class="operator">=</span> <span class="number">0</span>;</span><br><span class="line"><span class="comment">// 4 个线程，每个循环 10 万次 plain++</span></span><br></pre></td></tr></table></figure>
+
+<p>跑了几次，<code>plain</code> 的结果是 121418、120499 这类数字，<strong>都不是期望的 400000</strong>。这种”丢更新”的问题，本质是复合操作不具备<strong>原子性</strong>——中间状态会被其他线程插进来。</p>
+<p>对策通常是加锁（<code>synchronized</code> 或 <code>ReentrantLock</code>），或者用 <code>AtomicInteger</code> 这类基于 CAS 的原子类。把上面那段换成 <code>atomic.incrementAndGet()</code>，四次实验都稳定得到 400000。</p>
+<h2 id="可见性：一个线程的修改，另一个线程看不到"><a href="#可见性：一个线程的修改，另一个线程看不到" class="headerlink" title="可见性：一个线程的修改，另一个线程看不到"></a>可见性：一个线程的修改，另一个线程看不到</h2><p>原子性说的是”操作被打断”，可见性说的是”改了别人看不见”。</p>
+<p>现代 CPU 有多级缓存，线程读变量时不一定去主内存拿，可能一直读自己核心里缓存的值。写的时候也是先写本地缓存，什么时候同步回主内存、别核什么时候能看到，都没有保证。</p>
+<p>JMM（Java 内存模型）定义了一个抽象模型来描述这件事：<strong>所有变量都存在主内存，每个线程有自己的工作内存</strong>，线程对变量的读写都在工作内存里做，线程之间只能通过主内存传递数据。工作内存里可能只是 CPU 缓存的抽象，也可能包含寄存器、编译器优化后的临时值。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">┌──────────┐        ┌──────────┐</span><br><span class="line">│ 线程 A    │        │ 线程 B    │</span><br><span class="line">│ 工作内存  │        │ 工作内存  │</span><br><span class="line">└────┬─────┘        └─────┬────┘</span><br><span class="line">     │                    │</span><br><span class="line">     └────────┬───────────┘</span><br><span class="line">         ┌────▼─────┐</span><br><span class="line">         │  主内存   │</span><br><span class="line">         └──────────┘</span><br></pre></td></tr></table></figure>
+
+<p>这样一来，”A 改了 <code>flag = true</code>，B 还在循环里等 <code>flag</code>“就可能永远转不出来。解决它最轻的手段就是给 <code>flag</code> 加 <code>volatile</code>——<code>volatile</code> 写的值会立即刷回主内存，读的值也会从主内存重新读，别的线程就能及时看见。更彻底的说法是 <code>synchronized</code> 也会在释放锁时把工作内存写回主内存，所以它顺带解决了可见性。</p>
+<h2 id="有序性：指令重排"><a href="#有序性：指令重排" class="headerlink" title="有序性：指令重排"></a>有序性：指令重排</h2><p>第三类问题最反直觉。编译器为了优化、CPU 为了流水线，<strong>会在不影响单线程结果的前提下调整指令顺序</strong>。单线程下你感觉不到，因为”不影响单线程结果”是前提；可这个前提在多线程下就不成立了。</p>
+<p>最有名的例子是双重检查锁（DCL）单例：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">Singleton</span> &#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> Singleton instance;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> Singleton <span class="title function_">getInstance</span><span class="params">()</span> &#123;</span><br><span class="line">        <span class="keyword">if</span> (instance == <span class="literal">null</span>) &#123;              <span class="comment">// 第一次检查</span></span><br><span class="line">            <span class="keyword">synchronized</span> (Singleton.class) &#123;</span><br><span class="line">                <span class="keyword">if</span> (instance == <span class="literal">null</span>) &#123;      <span class="comment">// 第二次检查</span></span><br><span class="line">                    instance = <span class="keyword">new</span> <span class="title class_">Singleton</span>();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> instance;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>new Singleton()</code> 并不是原子操作，它至少分三步：分配内存、初始化对象、把引用赋给 <code>instance</code>。问题在于第 2 步和第 3 步可能被重排成”先把引用赋出去，再初始化”。这时候另一个线程走到第一次检查，看到 <code>instance != null</code>，直接拿着一个<strong>构造还没完成的对象</strong>去用了。</p>
+<p>修法很简单——给 <code>instance</code> 加 <code>volatile</code>，禁止这种重排。这个例子值得记，是因为它展示了一种很隐蔽的错觉：代码看上去有双重检查、看上去加了锁，但重排能让它失效。</p>
+<p>不过要说明的是，JDK 5 引入的新内存模型（JSR-133）让 <code>volatile</code> 真正能禁止这种重排——更早的 JMM 弱到连加了 <code>volatile</code> 都不保证修好。所以 DCL 只有在记得加 <code>volatile</code> 的前提下才是安全的，不加照样有问题。我把它当作理解”有序性”的教材，而不是一个需要天天防的线上炸弹。</p>
+<h2 id="三类问题与对策"><a href="#三类问题与对策" class="headerlink" title="三类问题与对策"></a>三类问题与对策</h2><p>把三个概念摆在一起看：</p>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>一句话描述</th>
+<th>典型症状</th>
+<th>主要对策</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>原子性</td>
+<td>操作被中断，中间状态被插队</td>
+<td><code>i++</code> 少加</td>
+<td><code>synchronized</code>、<code>ReentrantLock</code>、原子类</td>
+</tr>
+<tr>
+<td>可见性</td>
+<td>一个线程的修改，另一个线程看不到</td>
+<td>循环等一个标志位，永远等不到</td>
+<td><code>volatile</code>、<code>synchronized</code></td>
+</tr>
+<tr>
+<td>有序性</td>
+<td>指令被重排，单线程顺序被打乱</td>
+<td>拿到未初始化完成的对象</td>
+<td><code>volatile</code>、<code>synchronized</code>、<code>happens-before</code> 规则</td>
+</tr>
+</tbody></table>
+<p>这三类问题不是互斥的。一个 <code>synchronized</code> 块同时提供了原子性、可见性和有序性；<code>volatile</code> 只给后两个；原子类只解决原子性，且只解决<strong>一个变量</strong>上的原子性。搞清楚一个手段到底解决哪一类问题，比记住一堆名词有用得多。</p>
+<h2 id="收个尾"><a href="#收个尾" class="headerlink" title="收个尾"></a>收个尾</h2><p>我那个统计任务最后的修法是把 <code>int count</code> 换成了 <code>AtomicInteger</code>，问题就没了。当时觉得很神奇，现在回头看它只是补齐了原子性这一块，可见性和有序性在里面的处理反而更容易被忽略。JMM 这类东西，最好还是先有一个具体的 bug 摆在面前，再去理解它到底在防什么——不然很容易读成一堆抽象名词。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/JMM/" rel="tag"># JMM</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/05/10/%E4%B8%BA%E4%BB%80%E4%B9%88%E4%B8%8D%E8%A6%81new-Thread-%E7%BA%BF%E7%A8%8B%E6%B1%A0%E5%85%A5%E9%97%A8/" rel="prev" title="为什么不要 new Thread：线程池入门">
+                  <i class="fa fa-angle-left"></i> 为什么不要 new Thread：线程池入门
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/07/12/volatile%E5%88%B0%E5%BA%95%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98/" rel="next" title="volatile 到底解决了什么问题">
+                  volatile 到底解决了什么问题 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

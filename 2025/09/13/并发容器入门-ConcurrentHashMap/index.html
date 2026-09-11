@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从 HashMap 的并发问题讲到 ConcurrentHashMap 的分段锁">
+<meta property="og:type" content="article">
+<meta property="og:title" content="并发容器入门：ConcurrentHashMap">
+<meta property="og:url" content="https://aphthog.github.io/2025/09/13/%E5%B9%B6%E5%8F%91%E5%AE%B9%E5%99%A8%E5%85%A5%E9%97%A8-ConcurrentHashMap/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="从 HashMap 的并发问题讲到 ConcurrentHashMap 的分段锁">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-09-13T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.401Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="ConcurrentHashMap">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="并发">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/09/13/%E5%B9%B6%E5%8F%91%E5%AE%B9%E5%99%A8%E5%85%A5%E9%97%A8-ConcurrentHashMap/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/09/13/%E5%B9%B6%E5%8F%91%E5%AE%B9%E5%99%A8%E5%85%A5%E9%97%A8-ConcurrentHashMap/","path":"2025/09/13/并发容器入门-ConcurrentHashMap/","title":"并发容器入门：ConcurrentHashMap"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>并发容器入门：ConcurrentHashMap | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/09/13/%E5%B9%B6%E5%8F%91%E5%AE%B9%E5%99%A8%E5%85%A5%E9%97%A8-ConcurrentHashMap/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="并发容器入门：ConcurrentHashMap | Camille">
+      <meta itemprop="description" content="从 HashMap 的并发问题讲到 ConcurrentHashMap 的分段锁">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          并发容器入门：ConcurrentHashMap
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-09-13 21:00:00" itemprop="dateCreated datePublished" datetime="2025-09-13T21:00:00+00:00">2025-09-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">从 HashMap 的并发问题讲到 ConcurrentHashMap 的分段锁</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>之前给一个接口加本地缓存，图省事用了 <code>HashMap</code> 存”用户 ID -&gt; token”，并发也不高，一直没出事。后来有个批量任务把 QPS 顶上去了几天，开始零星报”缓存里的 key 明明写过却查不到”，偶尔还有接口卡死。</p>
+<p>查到最后，根子是那个 <code>HashMap</code>。这篇把当时搞明白的东西记一下：它为什么不能这么用，以及 <code>ConcurrentHashMap</code> 到底是怎么解决的。</p>
+<h2 id="HashMap-在多线程下会出什么事"><a href="#HashMap-在多线程下会出什么事" class="headerlink" title="HashMap 在多线程下会出什么事"></a>HashMap 在多线程下会出什么事</h2><p><code>HashMap</code> 从来就没打算支持并发读写。它的文档里写得很清楚，非线程安全。问题具体表现在两处，而且<strong>JDK 7 和 JDK 8 表现不一样</strong>，这个顺序别记反。</p>
+<p><strong>JDK 7：扩容时可能死循环。</strong> 那会儿 HashMap 的链表插入用的是头插法。多线程同时触发扩容、同时搬同一个桶里的元素时，两个线程的操作可能交错，把原本 a -&gt; b 的链表接成 a -&gt; b -&gt; a 这种环。之后任何一次 <code>get</code> 走到这个桶，就会沿着环一直转，把 CPU 吃满。这个现象当年叫得挺响，是很多人第一次意识到”集合默认不是线程安全的”。</p>
+<p><strong>JDK 8：改成尾插，环没了，但会丢数据。</strong> JDK 8 把链表插入改成尾插，扩容时的成环问题基本消除。但别误会成”JDK 8 的 HashMap 就安全了”——它仍然不是。两个线程同时往同一个空桶里 <code>put</code>，都判断这个位置为空、都把自己的节点放进去，后写的那个就覆盖了前一个，这条数据直接消失。更常见的版本是 <code>size</code> 计数错乱：两个线程各自算好的新容量互相覆盖，最后 <code>size</code> 对不上实际元素个数。</p>
+<p>我在本机做了个实验（JDK 17），8 个线程各写 10000 个不同的 key，期望总共 80000 条。下面是其中一次的输出（示例输出，实际丢多少条每次都会变）：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">HashMap size           = 29706 (expect 80000)</span><br><span class="line">ConcurrentHashMap size = 80000 (expect 80000)</span><br></pre></td></tr></table></figure>
+
+<p><code>HashMap</code> 最后只剩不到 3 万条。丢得这么夸张是因为这些线程本来就很可能触发扩容，扩容期间的数据搬运是重灾区；但真实业务里不需要丢这么多也会出事——<strong>丢一条就是一条</strong>。</p>
+<h2 id="ConcurrentHashMap-的解法（一）：分段锁"><a href="#ConcurrentHashMap-的解法（一）：分段锁" class="headerlink" title="ConcurrentHashMap 的解法（一）：分段锁"></a>ConcurrentHashMap 的解法（一）：分段锁</h2><p><code>ConcurrentHashMap</code> 从 JDK 5 就有了，最初的设计思路是<strong>分段锁</strong>（segment locking）。</p>
+<p>它把整个哈希表拆成若干段（默认 16 段），每段其实是一张小的哈希表，配一把自己的锁。写操作只锁住<strong>要操作的那一段</strong>，其他段照常读写。这样并发度从”整张表一把锁”提升到 16 倍左右——理论上同时可以有 16 个线程各写各的段。</p>
+<p>这个思路的意义在于，它把”锁的粒度”这个旋钮第一次拧到了对一个集合来说足够细的位置：不再是一张表一个锁，而是按数据分区各管各的。JDK 7 的 <code>ConcurrentHashMap</code> 就是这版实现。</p>
+<h2 id="ConcurrentHashMap-的解法（二）：CAS-头结点锁"><a href="#ConcurrentHashMap-的解法（二）：CAS-头结点锁" class="headerlink" title="ConcurrentHashMap 的解法（二）：CAS + 头结点锁"></a>ConcurrentHashMap 的解法（二）：CAS + 头结点锁</h2><p>JDK 8 又改了一次，把分段锁去掉了，换成更细的做法：</p>
+<ul>
+<li><strong>桶是空的</strong>：直接对数组里那个槽位做 CAS，谁抢到谁放，不涉及锁；</li>
+<li><strong>桶里已有元素</strong>：对<strong>这个桶的头结点</strong>加 <code>synchronized</code>，只锁这一个桶；</li>
+<li>扩容也是分段的（多个线程可以协作搬运）。</li>
+</ul>
+<p>对比一下锁的粒度：JDK 7 是”锁一段”，一段里有很多桶；JDK 8 是”锁一个桶”。粒度又细了一档。而且空桶插入避免了一切锁，这在插入密集的场景下省掉了大量开销。</p>
+<p>这里值得记的不是那些实现细节，而是一个方法论：<strong>并发容器优化的方向，一直是把锁的粒度往下切，能不用锁的地方就不上锁</strong>。分段锁是切一下，桶级锁加 CAS 是再切一下。</p>
+<p>顺带说个容易忽略的：<code>ConcurrentHashMap</code> 不允许 <code>key</code> 或 <code>value</code> 为 <code>null</code>，<code>HashMap</code> 可以。如果你从 <code>HashMap</code> 换成 <code>ConcurrentHashMap</code>，代码里那些”<code>get</code> 返回 <code>null</code> 就当作不存在”的判断会在遇到真正的 <code>null</code> 值时出错——<code>put</code> 的时候就直接抛 <code>NullPointerException</code> 了，不用等到 <code>get</code>。</p>
+<h2 id="复合操作用原子方法，不要-get-再-put"><a href="#复合操作用原子方法，不要-get-再-put" class="headerlink" title="复合操作用原子方法，不要 get 再 put"></a>复合操作用原子方法，不要 get 再 put</h2><p><code>ConcurrentHashMap</code> 的单个 <code>get</code> &#x2F; <code>put</code> 是线程安全的，但<strong>组合多个操作就不一定</strong>。这是最容易踩的一个坑。</p>
+<p>最典型的就是”先查后写”：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 错误写法：读-判断-写三步之间，别的线程随时可以插进来</span></span><br><span class="line"><span class="type">Integer</span> <span class="variable">old</span> <span class="operator">=</span> map.get(key);</span><br><span class="line"><span class="keyword">if</span> (old == <span class="literal">null</span>) &#123;</span><br><span class="line">    map.put(key, <span class="number">1</span>);</span><br><span class="line">&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">    map.put(key, old + <span class="number">1</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这本质上和前面的 <code>i++</code> 是同一类问题：<code>get</code> 和 <code>put</code> 各自都安全，合在一起不安全。4 个线程各跑 20 万次，期望 800000，实测结果是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">get-then-put = 292247 (expect 800000)</span><br><span class="line">merge        = 800000 (expect 800000)</span><br></pre></td></tr></table></figure>
+
+<p><code>ConcurrentHashMap</code> 把常用的复合操作都做成了原子方法，直接换成它们就行：</p>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>原子方法</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>不存在才放</td>
+<td><code>putIfAbsent(key, value)</code></td>
+</tr>
+<tr>
+<td>不存在才计算并放</td>
+<td><code>computeIfAbsent(key, k -&gt; ...)</code></td>
+</tr>
+<tr>
+<td>读出旧值算新值再写回</td>
+<td><code>compute(key, (k, v) -&gt; ...)</code></td>
+</tr>
+<tr>
+<td>合并</td>
+<td><code>merge(key, value, Integer::sum)</code></td>
+</tr>
+<tr>
+<td>存在才删</td>
+<td><code>remove(key, value)</code></td>
+</tr>
+</tbody></table>
+<p>比如上面那段改成 <code>map.merge(key, 1, Integer::sum)</code> 就对了。要注意 <code>computeIfAbsent</code> 的映射函数里<strong>不要做耗时操作或再去操作同一个 map</strong>，它是在桶上加了锁执行的，映射函数慢，会把这个桶卡住。</p>
+<h2 id="收尾"><a href="#收尾" class="headerlink" title="收尾"></a>收尾</h2><p><code>ConcurrentHashMap</code> 保证的是<strong>单个操作</strong>的原子性，不是”你这段业务逻辑”的原子性。如果逻辑里有”先判断缓存里有没有、没有再查库、再写回”这类复合流程，那还是得靠别的手段去防并发（比如分布式锁、或者接受重复查询）。搞清这一点，比记住分段锁的段数重要。</p>
+<p>回到我那个 token 缓存，最后就是把 <code>HashMap</code> 换成 <code>ConcurrentHashMap</code>、把”先 get 再 put”改成 <code>putIfAbsent</code>，报错就没了。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/ConcurrentHashMap/" rel="tag"># ConcurrentHashMap</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/08/16/synchronized%E5%92%8CReentrantLock%E7%9A%84%E5%8C%BA%E5%88%AB/" rel="prev" title="synchronized 和 ReentrantLock 的区别">
+                  <i class="fa fa-angle-left"></i> synchronized 和 ReentrantLock 的区别
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/10/18/CompletableFuture%E5%85%A5%E9%97%A8-%E6%8A%8A%E4%B8%B2%E8%A1%8C%E8%B0%83%E7%94%A8%E5%B9%B6%E8%A1%8C%E8%B5%B7%E6%9D%A5/" rel="next" title="CompletableFuture 入门：把串行调用并行起来">
+                  CompletableFuture 入门：把串行调用并行起来 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

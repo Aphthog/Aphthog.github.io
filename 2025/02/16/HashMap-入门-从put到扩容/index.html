@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="从 put 的链路讲到扩容时机，理清 HashMap 的数组、链表与红黑树">
+<meta property="og:type" content="article">
+<meta property="og:title" content="HashMap 入门：从 put 到扩容">
+<meta property="og:url" content="https://aphthog.github.io/2025/02/16/HashMap-%E5%85%A5%E9%97%A8-%E4%BB%8Eput%E5%88%B0%E6%89%A9%E5%AE%B9/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="从 put 的链路讲到扩容时机，理清 HashMap 的数组、链表与红黑树">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-02-16T20:30:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.399Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="HashMap">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="集合">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/02/16/HashMap-%E5%85%A5%E9%97%A8-%E4%BB%8Eput%E5%88%B0%E6%89%A9%E5%AE%B9/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/02/16/HashMap-%E5%85%A5%E9%97%A8-%E4%BB%8Eput%E5%88%B0%E6%89%A9%E5%AE%B9/","path":"2025/02/16/HashMap-入门-从put到扩容/","title":"HashMap 入门：从 put 到扩容"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>HashMap 入门：从 put 到扩容 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/02/16/HashMap-%E5%85%A5%E9%97%A8-%E4%BB%8Eput%E5%88%B0%E6%89%A9%E5%AE%B9/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="HashMap 入门：从 put 到扩容 | Camille">
+      <meta itemprop="description" content="从 put 的链路讲到扩容时机，理清 HashMap 的数组、链表与红黑树">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          HashMap 入门：从 put 到扩容
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-02-16 20:30:00" itemprop="dateCreated datePublished" datetime="2025-02-16T20:30:00+00:00">2025-02-16</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">从 put 的链路讲到扩容时机，理清 HashMap 的数组、链表与红黑树</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p><code>map.put(key, value)</code> 这行代码写过太多次，顺手到从来没想过它内部发生了什么。直到面试里被问”HashMap 为什么快”，我才发现自己只能答出”因为它用了哈希”，再往下就说不清了。回来把 put 的链路从头走了一遍，这篇就是那次梳理的记录。</p>
+<h2 id="一次-put-的三步"><a href="#一次-put-的三步" class="headerlink" title="一次 put 的三步"></a>一次 put 的三步</h2><p><strong>第一步是算 hash。</strong> 不是直接用 <code>key.hashCode()</code>，而是先做一次扰动：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">final</span> <span class="type">int</span> <span class="title function_">hash</span><span class="params">(Object key)</span> &#123;</span><br><span class="line">    <span class="type">int</span> h;</span><br><span class="line">    <span class="keyword">return</span> (key == <span class="literal">null</span>) ? <span class="number">0</span> : (h = key.hashCode()) ^ (h &gt;&gt;&gt; <span class="number">16</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>hashCode()</code> 返回一个 32 位的 int，而下面定位时只用得到低位。如果不处理，高 16 位的信息就白白浪费了——两个高位不同、低位相同的 key 会算到同一个位置去。这里把高 16 位异或到低 16 位上，让高位也参与进来，撞车的概率就小很多。</p>
+<p><strong>第二步是定位到桶。</strong> 下标算的是 <code>(n - 1) &amp; hash</code>，n 是数组容量。因为 n 是 2 的幂，对非负的 hash 这个按位与等价于取模；用按位与既能提速，也保证下标落在 <code>[0, n)</code> 范围内（<code>hashCode()</code> 可能是负数，取模会得到负下标）。这也解释了为什么 HashMap 的容量必须是 2 的幂——容量一旦不是 2 的幂，<code>(n-1) &amp; hash</code> 和取模就不等价了，分布会出问题。</p>
+<p><strong>第三步才是放进去。</strong> 桶是空的就直接放；桶里已经有东西，说明发生了哈希冲突，得想办法处理。</p>
+<h2 id="冲突了怎么办"><a href="#冲突了怎么办" class="headerlink" title="冲突了怎么办"></a>冲突了怎么办</h2><p>不同的 key 算到同一个下标是没法避免的，HashMap 的解法是拉链法：数组的每个位置挂一条链表，所有落在同一个桶里的节点串在这条链上。查找时先定位到桶，再沿着链表比 key，命中为止。</p>
+<p>链表长了，查找就退化成 O(n)。所以 JDK 8 起加了一条规则：<strong>链表长度到 8、并且数组容量到了 64 时，链表转成红黑树</strong>，查找从 O(n) 变成 O(log n)。容量没到 64 的话优先扩容——因为数组太小本身就会导致冲突多，扩容比转树更划算。</p>
+<p>这里最常见的一个追问是”为什么阈值偏偏是 8”。源码注释里用泊松分布算过一笔账，推导我不打算在这里展开，记住结论就够了：<strong>正常散列下链表长度到 8 是一个概率极低的事件</strong>，所以这个阈值不是为了日常优化，而是防极端情况的兜底——万一有人故意构造一堆 hash 相同的 key 塞进来，红黑树能把最坏情况从 O(n) 压到 O(log n)，不至于被一次查询拖垮。</p>
+<h2 id="什么时候扩容"><a href="#什么时候扩容" class="headerlink" title="什么时候扩容"></a>什么时候扩容</h2><p>HashMap 里有两个数字：容量（数组长度）和<strong>负载因子</strong>，默认 0.75。当元素个数超过 <code>容量 × 负载因子</code> 时触发扩容，新容量是原来的两倍。</p>
+<p>0.75 这个值是个折中。调低了数组大量位置空着，浪费内存；调高了冲突变多，链表变长，查询变慢。0.75 算是空间和时间上比较平衡的一个点。</p>
+<p>扩容的代价不小：要新建一个两倍大的数组，把旧数组里的元素重新分配到新数组——这一步是 O(n)。所以如果能预估元素数量，<code>new HashMap&lt;&gt;(expectedSize)</code> 给个初始容量，能省掉中间几次扩容的整体搬移。</p>
+<p>JDK 8 在这一点上做过一个优化：因为容量永远是 2 的幂，元素的新位置只有两种可能——<strong>要么留在原来的下标，要么移动到”原下标 + 旧容量”</strong>。定位只看 hash 的低几位，容量翻倍相当于多看了一位，所以不必重新计算 hash。这个结论在写业务代码时用不到，但它解释了为什么扩容可以不用重头再散一遍。</p>
+<h2 id="打印一下扩容前后的容量"><a href="#打印一下扩容前后的容量" class="headerlink" title="打印一下扩容前后的容量"></a>打印一下扩容前后的容量</h2><p>嘴上说过不如跑一遍。下面这段用反射读出 <code>table</code> 和 <code>threshold</code>，观察默认容量 16 时元素从第 12 个到第 13 个发生了什么（反射探私有字段只适合做实验，业务代码别这么写）：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> java.lang.reflect.Field;</span><br><span class="line"><span class="keyword">import</span> java.util.HashMap;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title class_">MapGrowth</span> &#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">main</span><span class="params">(String[] args)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">        HashMap&lt;String, Integer&gt; map = <span class="keyword">new</span> <span class="title class_">HashMap</span>&lt;&gt;();</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> <span class="variable">i</span> <span class="operator">=</span> <span class="number">1</span>; i &lt;= <span class="number">13</span>; i++) &#123;</span><br><span class="line">            map.put(<span class="string">&quot;key&quot;</span> + i, i);</span><br><span class="line">            <span class="keyword">if</span> (i == <span class="number">12</span> || i == <span class="number">13</span>) print(map, <span class="string">&quot;插入第 &quot;</span> + i + <span class="string">&quot; 个元素后&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">void</span> <span class="title function_">print</span><span class="params">(HashMap&lt;?, ?&gt; map, String tag)</span> <span class="keyword">throws</span> Exception &#123;</span><br><span class="line">        <span class="type">Field</span> <span class="variable">table</span> <span class="operator">=</span> HashMap.class.getDeclaredField(<span class="string">&quot;table&quot;</span>);</span><br><span class="line">        table.setAccessible(<span class="literal">true</span>);</span><br><span class="line">        <span class="type">Field</span> <span class="variable">threshold</span> <span class="operator">=</span> HashMap.class.getDeclaredField(<span class="string">&quot;threshold&quot;</span>);</span><br><span class="line">        threshold.setAccessible(<span class="literal">true</span>);</span><br><span class="line">        Object[] arr = (Object[]) table.get(map);</span><br><span class="line">        <span class="type">int</span> <span class="variable">capacity</span> <span class="operator">=</span> (arr == <span class="literal">null</span>) ? <span class="number">0</span> : arr.length;</span><br><span class="line">        System.out.printf(<span class="string">&quot;%s: size=%d, capacity=%d, threshold=%d%n&quot;</span>,</span><br><span class="line">                tag, map.size(), capacity, threshold.getInt(map));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里有个我自己先踩到的坑：JDK 16 起模块化默认禁止反射进入 <code>java.util</code>（JDK 9–15 只是告警），直接 <code>setAccessible(true)</code> 会抛 <code>InaccessibleObjectException</code>，要运行时加参数 <code>--add-opens java.base/java.util=ALL-UNNAMED</code> 才能跑。（我本地是 JDK 17，第一次跑就报了这个错。）</p>
+<p>输出是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">插入第 12 个元素后: size=12, capacity=16, threshold=12</span><br><span class="line">插入第 13 个元素后: size=13, capacity=32, threshold=24</span><br></pre></td></tr></table></figure>
+
+<p>第 12 个元素放进去时 <code>size == threshold</code>，还没超过，数组保持 16；再放第 13 个，<code>size</code> 变成 13 超过阈值，扩容到 32，新阈值也随之变成 32 × 0.75 &#x3D; 24。这就是那句”超过容量乘负载因子就扩容”的实际样子。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>一次 put 的链路：算 hash（带扰动）→ 按位与定位桶 → 冲突走链表 → 链表过长且容量够大时转红黑树；元素数超过容量乘 0.75 时容量翻倍并重新分配。把这条链路记住，HashMap 相关的多数问题都能顺着推出来。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E9%9B%86%E5%90%88/" rel="tag"># 集合</a>
+              <a href="/tags/HashMap/" rel="tag"># HashMap</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/01/12/Java-%E9%9B%86%E5%90%88%E5%85%A5%E9%97%A8-ArrayList%E5%92%8CLinkedList%E8%AF%A5%E6%80%8E%E4%B9%88%E9%80%89/" rel="prev" title="Java 集合入门：ArrayList 和 LinkedList 该怎么选">
+                  <i class="fa fa-angle-left"></i> Java 集合入门：ArrayList 和 LinkedList 该怎么选
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/03/15/Java-IO%E4%B8%8ENIO-%E4%B8%A4%E7%A7%8D%E8%AF%BB%E5%86%99%E6%A8%A1%E5%9E%8B%E7%9A%84%E5%8C%BA%E5%88%AB/" rel="next" title="Java IO 与 NIO：两种读写模型的区别">
+                  Java IO 与 NIO：两种读写模型的区别 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

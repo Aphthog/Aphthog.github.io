@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="引用计数缺陷、可达性分析、GC Roots 类型，分代假设与四种收集器概览">
+<meta property="og:type" content="article">
+<meta property="og:title" content="垃圾回收入门：从 GC Roots 说起">
+<meta property="og:url" content="https://aphthog.github.io/2025/12/20/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%85%A5%E9%97%A8-%E4%BB%8EGC-Roots%E8%AF%B4%E8%B5%B7/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="引用计数缺陷、可达性分析、GC Roots 类型，分代假设与四种收集器概览">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-12-20T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.401Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="GC">
+<meta property="article:tag" content="JVM">
+<meta property="article:tag" content="Java">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/12/20/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%85%A5%E9%97%A8-%E4%BB%8EGC-Roots%E8%AF%B4%E8%B5%B7/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/12/20/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%85%A5%E9%97%A8-%E4%BB%8EGC-Roots%E8%AF%B4%E8%B5%B7/","path":"2025/12/20/垃圾回收入门-从GC-Roots说起/","title":"垃圾回收入门：从 GC Roots 说起"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>垃圾回收入门：从 GC Roots 说起 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/12/20/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E5%85%A5%E9%97%A8-%E4%BB%8EGC-Roots%E8%AF%B4%E8%B5%B7/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="垃圾回收入门：从 GC Roots 说起 | Camille">
+      <meta itemprop="description" content="引用计数缺陷、可达性分析、GC Roots 类型，分代假设与四种收集器概览">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          垃圾回收入门：从 GC Roots 说起
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-12-20 21:00:00" itemprop="dateCreated datePublished" datetime="2025-12-20T21:00:00+00:00">2025-12-20</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">引用计数缺陷、可达性分析、GC Roots 类型，分代假设与四种收集器概览</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>有一次在群里看到有人问”两个对象互相引用，GC 会不会回收它们”，我第一反应是”互相引用应该不会回收吧”——但仔细一想，如果互相引用就不回收，循环引用岂不变成内存泄漏了？写这段的时候我才发现自己连 JVM 怎么判断对象存活都没搞清楚。这篇就从这个问题入手，把垃圾回收的几条核心概念记下来。</p>
+<h2 id="引用计数法的缺陷"><a href="#引用计数法的缺陷" class="headerlink" title="引用计数法的缺陷"></a>引用计数法的缺陷</h2><p>最直观的思路是给每个对象记一个”被引用的次数”：被引用计数加一，引用失效减一，到零就回收。但这个思路有一个绕不过去的缺陷——<strong>循环引用</strong>。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Node</span> &#123;</span><br><span class="line">    Node buddy;</span><br><span class="line">&#125;</span><br><span class="line"><span class="type">Node</span> <span class="variable">a</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Node</span>();</span><br><span class="line"><span class="type">Node</span> <span class="variable">b</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">Node</span>();</span><br><span class="line">a.buddy = b;</span><br><span class="line">b.buddy = a;</span><br><span class="line"><span class="comment">// 此处 a 和 b 互相引用，引用计数都不为 0</span></span><br><span class="line"><span class="comment">// 但实际上已经没有外部 GC Roots 指向它们了</span></span><br><span class="line"><span class="comment">// 按引用计数的逻辑，这两个对象永远无法被回收</span></span><br></pre></td></tr></table></figure>
+
+<p>循环引用在代码里很常见——双向链表、父子节点、观察者模式都有。引用计数法处理不了这个，所以主流的 JVM 没有用它来判断对象存活（Python 等语言的做法是用引用计数加额外手段处理循环引用，但 Java 走了另一条路）。</p>
+<h2 id="可达性分析"><a href="#可达性分析" class="headerlink" title="可达性分析"></a>可达性分析</h2><p>JVM 用的是<strong>可达性分析（Reachability Analysis）</strong>：从一组称为 GC Roots 的根对象出发，沿着引用链遍历，走不到的对象就是不可达的，可以被回收。</p>
+<p>用上面的例子来说：如果 <code>a</code> 和 <code>b</code> 都没有被任何 GC Roots 引用到，那从 Roots 出发就遍历不到它们——即使它们互相引用，JVM 也知道这些对象是垃圾。</p>
+<h3 id="GC-Roots-有哪些"><a href="#GC-Roots-有哪些" class="headerlink" title="GC Roots 有哪些"></a>GC Roots 有哪些</h3><table>
+<thead>
+<tr>
+<th>Roots 类型</th>
+<th>包含什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>虚拟机栈中引用的对象</td>
+<td>每个栈帧里局部变量表引用的对象</td>
+</tr>
+<tr>
+<td>本地方法栈中 JNI 引用的对象</td>
+<td>native 方法引用的 Java 对象</td>
+</tr>
+<tr>
+<td>方法区中类静态属性引用的对象</td>
+<td>static 变量指向的对象</td>
+</tr>
+<tr>
+<td>方法区中常量引用的对象</td>
+<td>字符串常量池等引用的对象</td>
+</tr>
+<tr>
+<td>活跃线程</td>
+<td>正在执行的 Thread 对象本身</td>
+</tr>
+</tbody></table>
+<p>举个例子：方法里的局部变量引用的对象、静态变量引用的工具类实例、常量池里的字符串——这些只要还在用，就不会被回收。</p>
+<h2 id="分代回收的假设"><a href="#分代回收的假设" class="headerlink" title="分代回收的假设"></a>分代回收的假设</h2><p>HotSpot 的分代设计基于一个统计规律：<strong>大部分对象朝生夕死</strong>——分配出来不久就成了垃圾。所以把堆分成年轻代和老年代：年轻代 GC 频繁但只扫部分内存，老年代 GC 间隔长。这个假设在大多数应用里成立，但不是绝对的——缓存类应用里对象活得久，需要调整分代参数或换收集器。</p>
+<h2 id="四种收集器一句话定位"><a href="#四种收集器一句话定位" class="headerlink" title="四种收集器一句话定位"></a>四种收集器一句话定位</h2><p>不同 JDK 版本默认的收集器不一样。我本地用 JDK 17，默认是 G1。下面用表格定位——每种只说一句话，不展开：</p>
+<table>
+<thead>
+<tr>
+<th>收集器</th>
+<th>一句话定位</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Serial</td>
+<td>单线程、Stop-The-World，适合几百 MB 以内的小堆或客户端模式</td>
+</tr>
+<tr>
+<td>Parallel</td>
+<td>多线程并行回收，追求<strong>高吞吐</strong>，JDK 8 默认就是这个</td>
+</tr>
+<tr>
+<td>CMS</td>
+<td>低停顿并发标记，不整理内存（JDK 9 标记废弃，JDK 14 正式移除）</td>
+</tr>
+<tr>
+<td>G1</td>
+<td>分区（Region）式收集，可预测停顿时间，JDK 9 起是默认收集器</td>
+</tr>
+</tbody></table>
+<p>这个表格只给个印象。每种收集器的参数细节和适用场景展开写又是一篇，但对于日常排查，知道”当前环境用什么收集器、它大致怎么工作”就够了。</p>
+<p>GC 是 JVM 比较大的话题，这篇只涉及”怎么判断该回收谁”——下一篇顺着类加载机制走，讲讲 JVM 怎么把 .class 文件变成可执行的代码。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/JVM/" rel="tag"># JVM</a>
+              <a href="/tags/GC/" rel="tag"># GC</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/12/06/%E4%BB%8E-Prompt-%E5%88%B0-RAG-%E4%B8%BA%E4%BB%80%E4%B9%88%E6%A8%A1%E5%9E%8B%E9%9C%80%E8%A6%81%E5%A4%96%E9%83%A8%E7%9F%A5%E8%AF%86/" rel="prev" title="从 Prompt 到 RAG：为什么模型需要外部知识">
+                  <i class="fa fa-angle-left"></i> 从 Prompt 到 RAG：为什么模型需要外部知识
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/01/10/%E5%90%91%E9%87%8F%E4%B8%8E%E7%9B%B8%E4%BC%BC%E5%BA%A6-%E4%BD%99%E5%BC%A6%E7%9B%B8%E4%BC%BC%E5%BA%A6%E5%85%A5%E9%97%A8/" rel="next" title="向量与相似度：余弦相似度入门">
+                  向量与相似度：余弦相似度入门 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

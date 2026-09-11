@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="输入输出定价差异，三种延迟来源，四种节省策略，延迟比成本更影响体验">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LLM 应用的成本与延迟：一次权衡记录">
+<meta property="og:url" content="https://aphthog.github.io/2026/07/18/LLM-%E5%BA%94%E7%94%A8%E7%9A%84%E6%88%90%E6%9C%AC%E4%B8%8E%E5%BB%B6%E8%BF%9F-%E4%B8%80%E6%AC%A1%E6%9D%83%E8%A1%A1%E8%AE%B0%E5%BD%95/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="输入输出定价差异，三种延迟来源，四种节省策略，延迟比成本更影响体验">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-07-18T10:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.399Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="LLM">
+<meta property="article:tag" content="工程">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/07/18/LLM-%E5%BA%94%E7%94%A8%E7%9A%84%E6%88%90%E6%9C%AC%E4%B8%8E%E5%BB%B6%E8%BF%9F-%E4%B8%80%E6%AC%A1%E6%9D%83%E8%A1%A1%E8%AE%B0%E5%BD%95/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/07/18/LLM-%E5%BA%94%E7%94%A8%E7%9A%84%E6%88%90%E6%9C%AC%E4%B8%8E%E5%BB%B6%E8%BF%9F-%E4%B8%80%E6%AC%A1%E6%9D%83%E8%A1%A1%E8%AE%B0%E5%BD%95/","path":"2026/07/18/LLM-应用的成本与延迟-一次权衡记录/","title":"LLM 应用的成本与延迟：一次权衡记录"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>LLM 应用的成本与延迟：一次权衡记录 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/07/18/LLM-%E5%BA%94%E7%94%A8%E7%9A%84%E6%88%90%E6%9C%AC%E4%B8%8E%E5%BB%B6%E8%BF%9F-%E4%B8%80%E6%AC%A1%E6%9D%83%E8%A1%A1%E8%AE%B0%E5%BD%95/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="LLM 应用的成本与延迟：一次权衡记录 | Camille">
+      <meta itemprop="description" content="输入输出定价差异，三种延迟来源，四种节省策略，延迟比成本更影响体验">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          LLM 应用的成本与延迟：一次权衡记录
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-07-18 10:00:00" itemprop="dateCreated datePublished" datetime="2026-07-18T10:00:00+00:00">2026-07-18</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">输入输出定价差异，三种延迟来源，四种节省策略，延迟比成本更影响体验</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>第一次把模型部署到线上时，我算了一笔账：一个用户的单次对话，光 API 费用就几毛钱——如果日活上千，一个月下来开销不小。而且相比费用，用户反馈最多的其实是”等太久”。这篇文章记录我对 LLM 应用中成本与延迟的实测和理解。</p>
+<h2 id="token-成本怎么算"><a href="#token-成本怎么算" class="headerlink" title="token 成本怎么算"></a>token 成本怎么算</h2><p>API 定价区分输入和输出，输出比输入贵 3–4 倍。以 OpenAI 的 GPT-4o 为例（参考价）：</p>
+<table>
+<thead>
+<tr>
+<th>方向</th>
+<th>价格（每百万 token）</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>输入</td>
+<td>$2.5</td>
+<td>你发的 prompt，用户的问题</td>
+</tr>
+<tr>
+<td>输出</td>
+<td>$10</td>
+<td>模型生成的回答</td>
+</tr>
+</tbody></table>
+<p>为什么输出更贵？因为生成 token 需要逐字推理，每一步都取决于上一步的结果，无法并行。而输入 token 可以一次并行处理。</p>
+<p>一个实际例子：假设客服 Agent 每次请求的 prompt 是 2000 token（系统提示 + 工具定义 + 历史消息），模型回复 300 token。成本就是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">成本 = (2000 × $2.5 + 300 × $10) / 1,000,000 = $0.008</span><br></pre></td></tr></table></figure>
+
+<p>单次不贵，但一天 1 万次对话就是 $80，一个月 $2400。中大型业务光模型 API 就能烧掉不少钱。</p>
+<h2 id="延迟的三个来源"><a href="#延迟的三个来源" class="headerlink" title="延迟的三个来源"></a>延迟的三个来源</h2><p>成本之外，延迟是最影响体验的因素。LLM 应用的延迟主要来自三个地方：</p>
+<ol>
+<li><p><strong>首 token 时间（TTFT）</strong>：从你发出请求到模型返回第一个 token 的时间。通常几百毫秒到几秒不等。受模型大小（稀疏 MoE 比密集模型快）、请求排队、网络延迟影响。</p>
+</li>
+<li><p><strong>生成速度</strong>：第一 token 之后，模型每秒钟生成多少 token。GPT-4o 大概 30–60 token&#x2F;s。这意味着一个 300 token 的回答需要 5–10 秒才能完整输出。</p>
+</li>
+<li><p><strong>串行调用次数</strong>：如果你的 Agent 需要连续调用 3 次 API（先理解意图、再查资料、再生成回答），总延迟 &#x3D; 3 × (TTFT + 生成时间)。这是最容易忽略的延迟放大因素。</p>
+</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>TTFT</th>
+<th>生成时间</th>
+<th>串行次数</th>
+<th>总延迟</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单轮问答（100 token 回复）</td>
+<td>0.5s</td>
+<td>2s</td>
+<td>1</td>
+<td>~2.5s</td>
+</tr>
+<tr>
+<td>单轮问答（500 token 回复）</td>
+<td>0.5s</td>
+<td>10s</td>
+<td>1</td>
+<td>~10.5s</td>
+</tr>
+<tr>
+<td>Agent 3 轮工具调用（每轮 300 token）</td>
+<td>0.5s × 3</td>
+<td>6s × 3</td>
+<td>3</td>
+<td>~19.5s</td>
+</tr>
+</tbody></table>
+<p>超过 10 秒用户就能明显感知”慢”，超过 20 秒大部分用户会流失。</p>
+<h2 id="常见的省法和加速策略"><a href="#常见的省法和加速策略" class="headerlink" title="常见的省法和加速策略"></a>常见的省法和加速策略</h2><h3 id="结果缓存"><a href="#结果缓存" class="headerlink" title="结果缓存"></a>结果缓存</h3><p>如果用户查相同的问题（比如”你们公司的退货政策是什么”），第一次请求之后把结果缓存起来。相同的输入直接返回缓存结果，零延迟、零成本。对于高频问问题很管用。</p>
+<h3 id="小模型路由"><a href="#小模型路由" class="headerlink" title="小模型路由"></a>小模型路由</h3><p>不是所有问题都需要 GPT-4 级别的模型。简单的翻译、格式化、分类——用小模型就够了。常见做法：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">请求进来 → 分类器判断难度</span><br><span class="line">  ├─ 简单 → 小模型（便宜、快）</span><br><span class="line">  └─ 复杂 → 大模型（准确但贵）</span><br></pre></td></tr></table></figure>
+
+<p>这个分类器本身可以是一个简单的关键词规则或者一个小模型。投几个月下来能省 40–60% 的 API 费用，同时平均延迟也降了。</p>
+<h3 id="并行工具调用"><a href="#并行工具调用" class="headerlink" title="并行工具调用"></a>并行工具调用</h3><p>Agent 需要调多个工具时，如果工具之间没有依赖关系，调并行而不是串行。比如查”北京的天气和空气质量”——应该同时调天气 API 和空气质量 API，而不是等天气查完再查空气。</p>
+<h3 id="流式输出"><a href="#流式输出" class="headerlink" title="流式输出"></a>流式输出</h3><p>不要在模型生成完所有 token 后才一次性展示给用户。用流式输出，生成一个字展示一个字。用户感受到的”首 token 时间”大幅缩短——虽然总生成时间没变，但用户觉得”它已经在回答了”。</p>
+<h2 id="老实说：多数场景延迟比成本更影响体验"><a href="#老实说：多数场景延迟比成本更影响体验" class="headerlink" title="老实说：多数场景延迟比成本更影响体验"></a>老实说：多数场景延迟比成本更影响体验</h2><p>写了几个 LLM 应用之后，我的真实感受是：<strong>成本是可以规划的，延迟是不可妥协的</strong>。</p>
+<p>成本高，你可以优化 prompt 长度、做缓存、选便宜模型，有明确的操作方向。但延迟是用户直接感知的——一个 3 秒回复和一个 15 秒回复，在用户眼里是天壤之别。Token 贵了可以多卖一点服务来覆盖，但体验慢了用户下次就不来了。</p>
+<p>最后一句话总结这篇回顾：做 LLM 应用，先把延迟压到 5 秒以内，再考虑降成本。流程冗余比模型贵更值得优先解决。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/LLM/" rel="tag"># LLM</a>
+              <a href="/tags/%E5%B7%A5%E7%A8%8B/" rel="tag"># 工程</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/07/11/%E7%BC%93%E5%AD%98%E7%A9%BF%E9%80%8F-%E5%87%BB%E7%A9%BF-%E9%9B%AA%E5%B4%A9-%E4%B8%89%E4%B8%AA%E5%B8%B8%E8%A2%AB%E5%BF%B5%E9%94%99%E7%9A%84%E5%90%8D%E8%AF%8D/" rel="prev" title="缓存穿透、击穿、雪崩：三个常被念错的名词">
+                  <i class="fa fa-angle-left"></i> 缓存穿透、击穿、雪崩：三个常被念错的名词
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/07/25/Redis-%E6%8C%81%E4%B9%85%E5%8C%96-RDB%E4%B8%8EAOF/" rel="next" title="Redis 持久化：RDB 与 AOF">
+                  Redis 持久化：RDB 与 AOF <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

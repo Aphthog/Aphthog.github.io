@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="ACID：undo log&#x2F;redo log&#x2F;锁+MVCC保证什么，长事务危害">
+<meta property="og:type" content="article">
+<meta property="og:title" content="事务与 ACID：从一次转账说起">
+<meta property="og:url" content="https://aphthog.github.io/2026/04/11/%E4%BA%8B%E5%8A%A1%E4%B8%8EACID-%E4%BB%8E%E4%B8%80%E6%AC%A1%E8%BD%AC%E8%B4%A6%E8%AF%B4%E8%B5%B7/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="ACID：undo log&#x2F;redo log&#x2F;锁+MVCC保证什么，长事务危害">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-04-11T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.401Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="事务">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/04/11/%E4%BA%8B%E5%8A%A1%E4%B8%8EACID-%E4%BB%8E%E4%B8%80%E6%AC%A1%E8%BD%AC%E8%B4%A6%E8%AF%B4%E8%B5%B7/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/04/11/%E4%BA%8B%E5%8A%A1%E4%B8%8EACID-%E4%BB%8E%E4%B8%80%E6%AC%A1%E8%BD%AC%E8%B4%A6%E8%AF%B4%E8%B5%B7/","path":"2026/04/11/事务与ACID-从一次转账说起/","title":"事务与 ACID：从一次转账说起"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>事务与 ACID：从一次转账说起 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/04/11/%E4%BA%8B%E5%8A%A1%E4%B8%8EACID-%E4%BB%8E%E4%B8%80%E6%AC%A1%E8%BD%AC%E8%B4%A6%E8%AF%B4%E8%B5%B7/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="事务与 ACID：从一次转账说起 | Camille">
+      <meta itemprop="description" content="ACID：undo log&#x2F;redo log&#x2F;锁+MVCC保证什么，长事务危害">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          事务与 ACID：从一次转账说起
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-04-11 21:00:00" itemprop="dateCreated datePublished" datetime="2026-04-11T21:00:00+00:00">2026-04-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">ACID：undo log/redo log/锁+MVCC保证什么，长事务危害</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>好友借钱，我在手机银行上点转账。扣款成功、余额减少了，但对方说没收到。这种场景在程序里对应的是：扣款 <code>UPDATE</code> 执行成功，入账的 <code>UPDATE</code> 没执行——数据不一致了。事务就是用来解决这个问题的。</p>
+<p>最简单的写法：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">START</span> TRANSACTION;</span><br><span class="line"><span class="keyword">UPDATE</span> accounts <span class="keyword">SET</span> balance <span class="operator">=</span> balance <span class="operator">-</span> <span class="number">100</span> <span class="keyword">WHERE</span> user_id <span class="operator">=</span> <span class="number">1</span>;</span><br><span class="line"><span class="keyword">UPDATE</span> accounts <span class="keyword">SET</span> balance <span class="operator">=</span> balance <span class="operator">+</span> <span class="number">100</span> <span class="keyword">WHERE</span> user_id <span class="operator">=</span> <span class="number">2</span>;</span><br><span class="line"><span class="keyword">COMMIT</span>;</span><br></pre></td></tr></table></figure>
+
+<p>两个 <code>UPDATE</code> 被包在同一个事务里，要么都成功（COMMIT），要么都失败（ROLLBACK）。这就是 ACID 的基本形态。</p>
+<h2 id="ACID-各自靠什么"><a href="#ACID-各自靠什么" class="headerlink" title="ACID 各自靠什么"></a>ACID 各自靠什么</h2><p>A（原子性）、C（一致性）、I（隔离性）、D（持久性）不是平行机制——C 是目的，A、I、D 是手段。</p>
+<p><strong>原子性 —— undo log。</strong> 如果第二个 <code>UPDATE</code> 执行失败，MySQL 需要把第一个 <code>UPDATE</code> 的效果撤回来。undo log 记录的是”修改之前的值”：对每一行修改，undo log 里存着该行修改前的旧版本。ROLLBACK 时，InnoDB 用 undo log 把数据恢复到事务开始前的状态。这就是原子性——要么不做，要么做完，不会停在中间。</p>
+<p><strong>持久性 —— redo log。</strong> <code>COMMIT</code> 之后，数据真的写死了吗？不一定。InnoDB 有 buffer pool，数据修改先在内存里进行，然后不定期刷盘。如果刚 <code>COMMIT</code> 还没刷盘就宕机了，数据就丢了。redo log 解决这个问题：事务提交时，先把修改记录写到 redo log（顺序写，很快），再慢慢刷数据页。宕机重启后，InnoDB 重放 redo log，保证已提交事务的修改不丢失。这就是 WAL（Write-Ahead Logging）策略——先写日志、再写数据。</p>
+<p><strong>隔离性 —— 锁 + MVCC。</strong> 两个事务同时转账到同一个账户，不加控制的话余额会出错。InnoDB 用行锁防止并发写冲突，用 MVCC（多版本并发控制）让读操作不阻塞写操作。这部分细节比较多，下一篇单独展开。</p>
+<p><strong>一致性是目的，不是具体机制。</strong> 一致性是说数据在任何时刻都符合业务规则——比如转账前后总余额不变。原子性保证不中途中断，持久性保证不丢，隔离性保证并发不搞乱。三者配合，最终达成数据一致性。靠的是应用层写对逻辑，不是数据库单方面能保证的。</p>
+<h2 id="开启事务的正确写法"><a href="#开启事务的正确写法" class="headerlink" title="开启事务的正确写法"></a>开启事务的正确写法</h2><p>显式事务：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">START</span> TRANSACTION;</span><br><span class="line"><span class="comment">-- 业务逻辑</span></span><br><span class="line"><span class="keyword">COMMIT</span>;     <span class="comment">-- 或者 ROLLBACK;</span></span><br></pre></td></tr></table></figure>
+
+<p>常见坑：在 <code>START TRANSACTION</code> 之后执行了 DDL（CREATE TABLE、ALTER TABLE 等），MySQL 会<strong>隐式提交</strong>当前事务。<code>INSERT</code>、<code>UPDATE</code>、<code>DELETE</code> 每条语句其实也是隐式事务——如果你没有手动 <code>START TRANSACTION</code>，每条语句自带一个事务。</p>
+<h2 id="长事务的危害"><a href="#长事务的危害" class="headerlink" title="长事务的危害"></a>长事务的危害</h2><p>刚接手项目的时候，数据库监控面板上显示一个活跃事务持续了十多分钟。查下来是代码里开了事务之后做了一个外部 HTTP 调用。长事务的危害有几层：</p>
+<ul>
+<li><strong>锁不释放</strong>：改过的行一直持有行锁，其他事务要改同一行就得等，直接拖慢整个系统。锁等待超时还会抛 <code>Lock wait timeout exceeded</code>。</li>
+<li><strong>undo log 膨胀</strong>：事务不结束，undo log 就不能清理。长时间不提交的事务会让 undo log 越积越多，甚至撑爆 undo 表空间。</li>
+<li><strong>MVCC 版本链拉长</strong>：后面的事务读数据时要沿着 undo log 版本链往前找，性能受影响。</li>
+</ul>
+<p>所以事务的原则是：<strong>短、快、不要再事务里做外部调用</strong>。读多写少或者纯查询不需要开事务，默认的自动提交就够了。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>ACID 四个特性不是理论概念——<code>START TRANSACTION</code> 之后的每一行代码都在和 undo log、redo log、锁打交道。写 SQL 事务的时候多想想：如果这一步挂了怎么办？如果两个事务同时改同一行怎么办？理解了背后的机制，写出来的事务代码会更稳当。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/%E4%BA%8B%E5%8A%A1/" rel="tag"># 事务</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/04/04/%E4%BB%80%E4%B9%88%E6%98%AF-MCP/" rel="prev" title="什么是 MCP">
+                  <i class="fa fa-angle-left"></i> 什么是 MCP
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/04/25/MVCC%E4%B8%8E%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E5%85%A5%E9%97%A8/" rel="next" title="MVCC 与隔离级别入门">
+                  MVCC 与隔离级别入门 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

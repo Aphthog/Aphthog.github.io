@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="列表接口P99从200ms涨到2s排查过程：慢查询日志、深分页根因、延迟关联改写">
+<meta property="og:type" content="article">
+<meta property="og:title" content="一次慢查询优化实践">
+<meta property="og:url" content="https://aphthog.github.io/2026/06/13/%E4%B8%80%E6%AC%A1%E6%85%A2%E6%9F%A5%E8%AF%A2%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="列表接口P99从200ms涨到2s排查过程：慢查询日志、深分页根因、延迟关联改写">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2026-06-13T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.400Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="MySQL">
+<meta property="article:tag" content="优化">
+<meta property="article:tag" content="索引">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2026/06/13/%E4%B8%80%E6%AC%A1%E6%85%A2%E6%9F%A5%E8%AF%A2%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2026/06/13/%E4%B8%80%E6%AC%A1%E6%85%A2%E6%9F%A5%E8%AF%A2%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/","path":"2026/06/13/一次慢查询优化实践/","title":"一次慢查询优化实践"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>一次慢查询优化实践 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2026/06/13/%E4%B8%80%E6%AC%A1%E6%85%A2%E6%9F%A5%E8%AF%A2%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="一次慢查询优化实践 | Camille">
+      <meta itemprop="description" content="列表接口P99从200ms涨到2s排查过程：慢查询日志、深分页根因、延迟关联改写">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          一次慢查询优化实践
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2026-06-13 21:00:00" itemprop="dateCreated datePublished" datetime="2026-06-13T21:00:00+00:00">2026-06-13</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">列表接口P99从200ms涨到2s排查过程：慢查询日志、深分页根因、延迟关联改写</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>周三下午，测试环境的接口监控报警：订单列表页的 P99 延迟从平时的 200ms 飙到了 2s 以上。我心里咯噔一下——业务量没涨，代码也没上线新版本，问题大概率在数据库。</p>
+<p>先看慢查询日志。MySQL 可以配置 <code>slow_query_log = 1</code> 和 <code>long_query_time = 1</code>，超过 1 秒的 SQL 会被记录下来。翻日志，找到那条拖垮接口的 SQL：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> id, order_no, status, total_amount, create_time</span><br><span class="line"><span class="keyword">FROM</span> orders</span><br><span class="line"><span class="keyword">WHERE</span> status <span class="operator">=</span> <span class="number">1</span></span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> create_time <span class="keyword">DESC</span></span><br><span class="line">LIMIT <span class="number">100000</span>, <span class="number">20</span>;</span><br></pre></td></tr></table></figure>
+
+<p>LIMIT 100000, 20——翻到第 5000 页了。接口是支持翻页的，正常情况下用户不会翻这么多页，但有个定时任务会逐页遍历全量数据做统计，跑到后面就爆炸了。</p>
+<h2 id="EXPLAIN-确认"><a href="#EXPLAIN-确认" class="headerlink" title="EXPLAIN 确认"></a>EXPLAIN 确认</h2><p>EXPLAIN 一看：</p>
+<table>
+<thead>
+<tr>
+<th>type</th>
+<th>key</th>
+<th>rows</th>
+<th>Extra</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ALL</td>
+<td>NULL</td>
+<td>130 万</td>
+<td>Using where; Using filesort</td>
+</tr>
+</tbody></table>
+<p>问题很清楚：</p>
+<ol>
+<li><strong>type &#x3D; ALL</strong>：全表扫描。<code>status</code> 没有索引，<code>ORDER BY create_time</code> 也没有索引。</li>
+<li><strong>Extra 有 filesort</strong>：需要对 130 万行做排序，再取最后 20 条。</li>
+<li><strong>LIMIT 100000, 20</strong>：MySQL 不是直接跳到第 10 万条开始取的——它会先查出满足条件的全部行和排序，然后扔掉前 10 万条。翻的页越深，丢弃的数据越多，耗时就线性增长。</li>
+</ol>
+<h2 id="深分页的根因"><a href="#深分页的根因" class="headerlink" title="深分页的根因"></a>深分页的根因</h2><p>数据库里的翻页和人类翻书不一样。LIMIT 100000, 20 真正做的事情是：先找 100020 条，再扔掉前面的 100000 条。扫描的行数 &#x3D; offset + limit。offset 越大，读的越多，跟加不加索引关系不大——走索引也得读那么多条。</p>
+<p>这就是”深分页”问题的本质：<strong>offset 越大，MySQL 扫描和丢弃的数据就越多，时间就越长。</strong></p>
+<h2 id="优化：联合索引-延迟关联"><a href="#优化：联合索引-延迟关联" class="headerlink" title="优化：联合索引 + 延迟关联"></a>优化：联合索引 + 延迟关联</h2><p>第一步，加联合索引。查询条件是 <code>status = 1</code> 然后按 <code>create_time</code> 排序，所以建：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER TABLE</span> orders <span class="keyword">ADD</span> INDEX idx_status_create_time (status, create_time);</span><br></pre></td></tr></table></figure>
+
+<p>这个索引能让 <code>WHERE status = 1</code> 走索引（type &#x3D; ref），<code>ORDER BY create_time</code> 直接在索引上完成排序，去掉 filesort。但深分页的问题还在——即使走索引，<code>LIMIT 100000, 20</code> 仍然需要扫描 100020 条索引记录。</p>
+<p>第二步，改成<strong>延迟关联（Deferred Join）</strong>。核心思路是：只让索引覆盖查询去定位需要的主键 ID，再用这些主键 ID 去回表取整行数据。这样回表只需要 20 次，而不是 100020 次。</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> t.id, t.order_no, t.status, t.total_amount, t.create_time</span><br><span class="line"><span class="keyword">FROM</span> orders t</span><br><span class="line"><span class="keyword">INNER</span> <span class="keyword">JOIN</span> (</span><br><span class="line">    <span class="keyword">SELECT</span> id</span><br><span class="line">    <span class="keyword">FROM</span> orders</span><br><span class="line">    <span class="keyword">WHERE</span> status <span class="operator">=</span> <span class="number">1</span></span><br><span class="line">    <span class="keyword">ORDER</span> <span class="keyword">BY</span> create_time <span class="keyword">DESC</span></span><br><span class="line">    LIMIT <span class="number">100000</span>, <span class="number">20</span></span><br><span class="line">) <span class="keyword">AS</span> tmp <span class="keyword">ON</span> t.id <span class="operator">=</span> tmp.id</span><br><span class="line"><span class="keyword">ORDER</span> <span class="keyword">BY</span> t.create_time <span class="keyword">DESC</span>;</span><br></pre></td></tr></table></figure>
+
+<p>内层子查询只查 <code>id</code> 字段，<code>(status, create_time)</code> 联合索引已经覆盖了——不需要回表，直接在索引树上完成排序和分页，只扫描 100020 条索引记录，拿到 20 个 id。</p>
+<p>外层再根据这 20 个 id 回聚簇索引取整行，只做 20 次回表。</p>
+<h2 id="优化前后对比"><a href="#优化前后对比" class="headerlink" title="优化前后对比"></a>优化前后对比</h2><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>优化前</th>
+<th>优化后</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>type</td>
+<td>ALL（全表扫描）</td>
+<td>ref</td>
+</tr>
+<tr>
+<td>rows</td>
+<td>130 万</td>
+<td>约 100020（索引扫描） + 20（回表）</td>
+</tr>
+<tr>
+<td>Extra</td>
+<td>Using where; Using filesort</td>
+<td>Using index（子查询）</td>
+</tr>
+<tr>
+<td>耗时（P99）</td>
+<td>~2s</td>
+<td>~50ms</td>
+</tr>
+</tbody></table>
+<p>优化后耗时从 2 秒降到了 50 毫秒。子查询里的 <code>SELECT id</code> 走覆盖索引，外层回表只有 20 行——数据量对这个查询不再是瓶颈。</p>
+<h2 id="补充思考"><a href="#补充思考" class="headerlink" title="补充思考"></a>补充思考</h2><p>延迟关联不是万能的。如果 offset 巨大（比如翻到第 100 万条），索引扫描仍然要扫 100 万条记录，即使不回表也有开销。对于这种场景，更好的方案是<strong>基于游标的翻页</strong>：不用 <code>LIMIT offset, limit</code>，改成 <code>WHERE create_time &lt; 上次最后一条的 create_time ORDER BY create_time DESC LIMIT 20</code>，这样每次都是 O(1) 的定位。缺点是翻页不连续（不能直接跳到第 N 页），和产品设计有关，不是所有场景都适用。</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>这次排查让我对深分页有了很具体的认识。<code>LIMIT 100000, 20</code> 不是”跳到第 10 万条然后拿 20 条”，而是”先数 100020 条、扔掉前 10 万条”。联合索引解决了 filesort 问题，延迟关联把回表次数从 100020 降到 20。优化没有用高级技巧，就是把索引和数据访问的路径对齐——理解 InnoDB 怎么存数据和怎么扫描的，倒推回 SQL 改写就能找到方向。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/MySQL/" rel="tag"># MySQL</a>
+              <a href="/tags/%E7%B4%A2%E5%BC%95/" rel="tag"># 索引</a>
+              <a href="/tags/%E4%BC%98%E5%8C%96/" rel="tag"># 优化</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2026/05/23/%E4%B8%8A%E4%B8%8B%E6%96%87%E5%B7%A5%E7%A8%8B%E5%85%A5%E9%97%A8-Agent-%E7%9A%84%E8%AE%B0%E5%BF%86%E8%AF%A5%E6%80%8E%E4%B9%88%E8%AE%BE%E8%AE%A1/" rel="prev" title="上下文工程入门：Agent 的记忆该怎么设计">
+                  <i class="fa fa-angle-left"></i> 上下文工程入门：Agent 的记忆该怎么设计
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2026/06/27/Redis-%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E5%85%A5%E9%97%A8-%E4%BA%94%E7%A7%8D%E7%B1%BB%E5%9E%8B%E6%80%8E%E4%B9%88%E7%94%A8/" rel="next" title="Redis 数据结构入门：五种类型怎么用">
+                  Redis 数据结构入门：五种类型怎么用 <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

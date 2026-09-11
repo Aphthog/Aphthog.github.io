@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#d4783e"><meta name="generator" content="Hexo 8.1.2">
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#d4783e">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.0/css/all.min.css" integrity="sha256-VHqXKFhhMxcpubYf9xiWdCiojEbY9NexQ4jh8AxbvcM=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"aphthog.github.io","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.27.0","exturl":false,"sidebar":{"position":"left","width_expanded":320,"width_dual_column":240,"display":"remove","padding":18,"offset":12},"hljswrap":true,"codeblock":{"theme":{"light":"default","dark":"stackoverflow-dark"},"prism":{"light":"prism","dark":"prism-dark"},"copy_button":{"enable":true,"style":"flat","show_result":true},"fold":{"enable":false,"height":500},"language":false,"highlight_theme":"normal"},"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":true,"lazyload":true,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"stickytabs":false,"motion":{"enable":true,"async":false,"duration":200,"transition":{"menu_item":"fadeInDown","post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js" defer></script>
+
+    <meta name="description" content="用法对比、锁升级，以及 ReentrantLock 多出的几项能力">
+<meta property="og:type" content="article">
+<meta property="og:title" content="synchronized 和 ReentrantLock 的区别">
+<meta property="og:url" content="https://aphthog.github.io/2025/08/16/synchronized%E5%92%8CReentrantLock%E7%9A%84%E5%8C%BA%E5%88%AB/index.html">
+<meta property="og:site_name" content="Camille">
+<meta property="og:description" content="用法对比、锁升级，以及 ReentrantLock 多出的几项能力">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2025-08-16T21:00:00.000Z">
+<meta property="article:modified_time" content="2026-09-11T07:54:47.400Z">
+<meta property="article:author" content="Camille">
+<meta property="article:tag" content="Java">
+<meta property="article:tag" content="并发">
+<meta property="article:tag" content="锁">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://aphthog.github.io/2025/08/16/synchronized%E5%92%8CReentrantLock%E7%9A%84%E5%8C%BA%E5%88%AB/">
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"https://aphthog.github.io/2025/08/16/synchronized%E5%92%8CReentrantLock%E7%9A%84%E5%8C%BA%E5%88%AB/","path":"2025/08/16/synchronized和ReentrantLock的区别/","title":"synchronized 和 ReentrantLock 的区别"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>synchronized 和 ReentrantLock 的区别 | Camille</title>
+  
+
+
+
+
+
+
+
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/medium-zoom/1.1.0/medium-zoom.min.js" integrity="sha256-ZgMyDAIYDYGxbcpJcfUnYwNevG/xi9OHKaR/8GK+jWc=" crossorigin="anonymous" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lozad.js/1.16.0/lozad.min.js" integrity="sha256-mOFREFhqmHeQbXpK2lp4nA3qooVgACfh88fpJftLBbc=" crossorigin="anonymous" defer></script>
+<script src="/js/utils.js" defer></script><script src="/js/motion.js" defer></script><script src="/js/next-boot.js" defer></script>
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <div class="column">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">Camille</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">写代码 · 按快门</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger" aria-label="搜索" role="button">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu"><li class="menu-item menu-item-首页"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li><li class="menu-item menu-item-合集"><a href="/collections/" rel="section"><i class="fa fa-book fa-fw"></i>合集</a></li><li class="menu-item menu-item-分类"><a href="/categories/" rel="section"><i class="fa fa-folder-open fa-fw"></i>分类</a></li><li class="menu-item menu-item-归档"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li><li class="menu-item menu-item-关于"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+  </ul>
+</nav>
+
+
+
+
+</header>
+    </div>
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://aphthog.github.io/2025/08/16/synchronized%E5%92%8CReentrantLock%E7%9A%84%E5%8C%BA%E5%88%AB/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="Camille">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Camille">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="synchronized 和 ReentrantLock 的区别 | Camille">
+      <meta itemprop="description" content="用法对比、锁升级，以及 ReentrantLock 多出的几项能力">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          synchronized 和 ReentrantLock 的区别
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2025-08-16 21:00:00" itemprop="dateCreated datePublished" datetime="2025-08-16T21:00:00+00:00">2025-08-16</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2026-09-11 07:54:47" itemprop="dateModified" datetime="2026-09-11T07:54:47+00:00">2026-09-11</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0/" itemprop="url" rel="index"><span itemprop="name">技术笔记</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+            <div class="post-description">用法对比、锁升级，以及 ReentrantLock 多出的几项能力</div>
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody"><p>有次处理线上问题，一个改库存的接口卡住了。堆栈打出来，几个线程停在同一个 <code>ReentrantLock</code> 上，另一个线程很久没动——它中间抛了异常，绕过了 <code>unlock</code>。那次之后我才真正记住：<code>synchronized</code> 的锁是 JVM 自动放的，<code>ReentrantLock</code> 的锁得自己放，而且必须放在 <code>finally</code> 里。</p>
+<p>这篇把这两把锁的差别理一理。它们都能做到”同一时刻只有一个线程进临界区”，但用起来和能给的东西差不少。</p>
+<h2 id="用法：一个靠关键字，一个靠-API"><a href="#用法：一个靠关键字，一个靠-API" class="headerlink" title="用法：一个靠关键字，一个靠 API"></a>用法：一个靠关键字，一个靠 API</h2><p><code>synchronized</code> 是语言层面的，能修饰方法，也能修饰代码块：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 修饰实例方法：锁的是 this</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title function_">add</span><span class="params">()</span> &#123; count++; &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 修饰静态方法：锁的是 Class 对象</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title function_">stat</span><span class="params">()</span> &#123; ... &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 修饰代码块：锁的是括号里那个对象</span></span><br><span class="line"><span class="keyword">synchronized</span> (lock) &#123;</span><br><span class="line">    count++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>ReentrantLock</code> 是 JDK 5 引入的一个类，加锁解锁都是显式方法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">final</span> <span class="type">ReentrantLock</span> <span class="variable">lock</span> <span class="operator">=</span> <span class="keyword">new</span> <span class="title class_">ReentrantLock</span>();</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title function_">add</span><span class="params">()</span> &#123;</span><br><span class="line">    lock.lock();</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        count++;</span><br><span class="line">    &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">        lock.unlock();     <span class="comment">// 必须放在 finally</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>两者都是<strong>可重入</strong>的：同一个线程重复进入自己已持有的锁，计数会累加，不会把自己锁死。这一点上它们没有差别。</p>
+<h2 id="对照表"><a href="#对照表" class="headerlink" title="对照表"></a>对照表</h2><table>
+<thead>
+<tr>
+<th>维度</th>
+<th>synchronized</th>
+<th>ReentrantLock</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>加锁方式</td>
+<td>关键字，JVM 管理</td>
+<td><code>lock()</code> &#x2F; <code>unlock()</code> 显式调用</td>
+</tr>
+<tr>
+<td>释放锁</td>
+<td>出临界区或抛异常时自动释放</td>
+<td>必须手写 <code>unlock()</code>，通常配 <code>finally</code></td>
+</tr>
+<tr>
+<td>能否中断等待</td>
+<td>加锁等待不可中断（<code>Object.wait()</code> 可以）</td>
+<td>可以，<code>lockInterruptibly()</code></td>
+</tr>
+<tr>
+<td>能否超时</td>
+<td>不能</td>
+<td>可以，<code>tryLock(timeout, unit)</code></td>
+</tr>
+<tr>
+<td>公平锁</td>
+<td>不支持</td>
+<td>支持，构造时传 <code>true</code></td>
+</tr>
+<tr>
+<td>条件等待</td>
+<td>只有一个等待集（<code>wait</code> &#x2F; <code>notify</code>）</td>
+<td>可以 <code>newCondition()</code> 分出多个</td>
+</tr>
+<tr>
+<td>性能</td>
+<td>JDK 6 之后优化明显，无竞争时开销很低</td>
+<td>相近；竞争激烈时可选公平策略</td>
+</tr>
+</tbody></table>
+<p>先说一件容易搞错的事：<strong><code>ReentrantLock</code> 不实现 <code>AutoCloseable</code>，不能写在 try-with-resources 里</strong>（<code>try (lock)</code> 编译不过），必须老老实实 <code>try/finally</code>。我见过有人想当然这么写，编译器直接就给拒了。</p>
+<h2 id="synchronized-的锁升级"><a href="#synchronized-的锁升级" class="headerlink" title="synchronized 的锁升级"></a>synchronized 的锁升级</h2><p><code>ReentrantLock</code> 的定位常被当成”synchronized 的加强版”，但要理解为什么日常大多数场景 <code>synchronized</code> 就够了，得知道 JVM 在它身上做了什么。</p>
+<p><code>synchronized</code> 在 JVM 里并不是一上来就找操作系统。它有个逐步升级的过程，通常叫<strong>锁升级</strong>：</p>
+<ul>
+<li><strong>偏向锁</strong>：如果从头到尾只有一个线程来来回回进这个锁，JVM 干脆不真加锁，只是在对象头里记下这个线程。这段代码看起来比无锁代码多写了 <code>synchronized</code>，实际开销几乎为零。</li>
+<li><strong>轻量级锁</strong>：有第二个线程来竞争时，偏向失效，升级为轻量级锁——用 CAS 尝试把锁的标记指向自己的栈帧，竞争不激烈时不阻塞线程，靠自旋等一会儿。</li>
+<li><strong>重量级锁</strong>：自旋还拿不到（竞争时间长、线程多），才升级到重量级锁，此时线程会被挂起，交给操作系统调度。这一步开销最大，因为涉及用户态和内核态的切换。</li>
+</ul>
+<p>升级是单向的，升上去不会退回来。这个机制解释了一个反直觉的现象：<strong><code>synchronized</code> 慢只慢在”真的有竞争”的时候</strong>，没人竞争时它非常便宜。</p>
+<p>要提醒的是，偏向锁是 HotSpot 的具体实现，不是 Java 语言规范的一部分：它在 JDK 15 起默认被禁用（更早的版本默认开启），之后被从 HotSpot 里移除。所以”锁升级三阶段”更适合当作理解”无竞争时为什么便宜”的模型，不必当成每个 JVM 上都成立的定律。</p>
+<h2 id="ReentrantLock-多出来的能力"><a href="#ReentrantLock-多出来的能力" class="headerlink" title="ReentrantLock 多出来的能力"></a>ReentrantLock 多出来的能力</h2><p>那什么时候值得用 <code>ReentrantLock</code>？它比 <code>synchronized</code> 多出的，主要是四项控制能力：</p>
+<p><strong>可中断。</strong> 用 <code>lockInterruptibly()</code> 等锁时，线程可以被 <code>interrupt()</code> 打断，不至于死等。</p>
+<p><strong>可超时。</strong> <code>tryLock(300, TimeUnit.MILLISECONDS)</code> 试一下，拿不到就返回 <code>false</code>，可以走降级逻辑。我把一个线程先拿到锁、sleep 2 秒，主线程再试着拿，输出是：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">tryLock(300ms) = false          // 300ms 内没拿到，主动放弃</span><br><span class="line">after release, tryLock = true   // 原持有者释放后，再试就拿到了</span><br></pre></td></tr></table></figure>
+
+<p>这种”拿不到就放弃”的语义，<code>synchronized</code> 是没有的。</p>
+<p><strong>公平锁。</strong> 构造函数传 <code>true</code>，等待最久的线程优先拿锁。代价是吞吐会降，因为要维护等待队列的顺序，所以默认是 <code>false</code>（非公平）。只有确实需要防止某些线程被反复插队饿死时才开。</p>
+<p><strong>多个 Condition。</strong> <code>synchronized</code> 只有一个等待集，<code>notify()</code> 唤醒的是谁不确定，只能靠 <code>while</code> 循环重新判断条件。<code>ReentrantLock</code> 可以 <code>newCondition()</code> 分出多个等待队列，把生产者和消费者分开关——比如队列满时唤醒消费者、队列空时唤醒生产者，各睡各的，不用全体”惊群”。</p>
+<h2 id="怎么选"><a href="#怎么选" class="headerlink" title="怎么选"></a>怎么选</h2><p>我现在的默认选择是 <code>synchronized</code>：写起来短，不会忘了解锁，而且大多数临界区本来就只是几个自增或几行赋值，没有”中断””超时”这些需求，升级机制也把无竞争时的开销压得很低。</p>
+<p>真正值得换成 <code>ReentrantLock</code> 的场景，是有明确理由用到上面那四项之一的：需要超时避免请求被拖住、需要在关服时中断等锁的线程、需要公平性、或者需要多个条件队列做精确唤醒。如果只是”听说 ReentrantLock 更灵活”就换过去，得到的是一个必须在 <code>finally</code> 里手动释放的锁，出错概率反而更高。</p>
+<p>另外，如果只是想控制”同时最多几个线程访问”这种并发量，<code>Semaphore</code> 比这两把锁都合适——锁管的是互斥，信号量管的是配额，这两件事容易混。这个下次单独说。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Java/" rel="tag"># Java</a>
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/%E9%94%81/" rel="tag"># 锁</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2025/07/12/volatile%E5%88%B0%E5%BA%95%E8%A7%A3%E5%86%B3%E4%BA%86%E4%BB%80%E4%B9%88%E9%97%AE%E9%A2%98/" rel="prev" title="volatile 到底解决了什么问题">
+                  <i class="fa fa-angle-left"></i> volatile 到底解决了什么问题
+                </a>
+            </div>
+            <div class="post-nav-item">
+                <a href="/2025/09/13/%E5%B9%B6%E5%8F%91%E5%AE%B9%E5%99%A8%E5%85%A5%E9%97%A8-ConcurrentHashMap/" rel="next" title="并发容器入门：ConcurrentHashMap">
+                  并发容器入门：ConcurrentHashMap <i class="fa fa-angle-right"></i>
+                </a>
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+  <div class="copyright">
+    &copy; 
+    <span itemprop="copyrightYear">2026</span>
+    <span class="with-love">
+      <i class="fa fa-heart"></i>
+    </span>
+    <span class="author" itemprop="copyrightHolder">Camille</span>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up fa-lg"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</body>
+</html>

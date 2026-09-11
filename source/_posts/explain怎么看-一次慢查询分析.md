@@ -3,7 +3,7 @@ title: explain 怎么看：一次慢查询分析
 date: 2026-03-28 21:00
 categories: [技术笔记]
 tags: [MySQL, explain, 索引]
-description: explain各列含义、type从好到坏排名、filesort含义，一条真实慢SQL完整走一遍
+description: explain各列、type排名、filesort含义，一条真实慢SQL走一遍
 collection: mysql
 ---
 

@@ -3,7 +3,7 @@ title: 事务与 ACID：从一次转账说起
 date: 2026-04-11 21:00
 categories: [技术笔记]
 tags: [MySQL, 事务]
-description: 通过转账例子理解ACID，undo log/redo log/锁+MVCC分别保证什么，长事务危害
+description: ACID：undo log/redo log/锁+MVCC保证什么，长事务危害
 collection: mysql
 ---
 

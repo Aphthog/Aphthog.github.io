@@ -21,7 +21,7 @@ function render(templateName, locals) {
 }
 
 hexo.extend.generator.register('collections', function (locals) {
-  const groups = buildCollectionGroups(locals);
+  const groups = buildCollectionGroups(locals, hexo.log);
   const flat = groups.reduce((acc, g) => acc.concat(g.collections), []);
 
   const pages = [{

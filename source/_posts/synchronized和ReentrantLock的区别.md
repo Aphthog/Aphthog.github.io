@@ -51,7 +51,7 @@ public void add() {
 |---|---|---|
 | 加锁方式 | 关键字，JVM 管理 | `lock()` / `unlock()` 显式调用 |
 | 释放锁 | 出临界区或抛异常时自动释放 | 必须手写 `unlock()`，通常配 `finally` |
-| 能否中断等待 | 不能（等待时不可中断） | 可以，`lockInterruptibly()` |
+| 能否中断等待 | 加锁等待不可中断（`Object.wait()` 可以） | 可以，`lockInterruptibly()` |
 | 能否超时 | 不能 | 可以，`tryLock(timeout, unit)` |
 | 公平锁 | 不支持 | 支持，构造时传 `true` |
 | 条件等待 | 只有一个等待集（`wait` / `notify`） | 可以 `newCondition()` 分出多个 |

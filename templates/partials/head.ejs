@@ -70,30 +70,6 @@ body {
   letter-spacing: 0.3px;
 }
 
-/* Tabs */
-.tabs {
-  display: flex;
-  justify-content: center;
-  gap: 28px;
-  margin-bottom: 28px;
-}
-.tab {
-  font-size: 13px;
-  color: #9a8a78;
-  background: none;
-  border: none;
-  padding: 0 0 4px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: color 200ms;
-}
-.tab:hover { color: #d4783e; }
-.tab.active { color: #d4783e; font-weight: 500; border-bottom: 1.5px solid #d4783e; }
-
-/* Article list */
-.section-content { display: none; }
-.section-content.active { display: block; }
-
 .article-item {
   display: block;
   padding: 20px 0;
@@ -121,13 +97,6 @@ body {
   line-height: 1.5;
 }
 
-.empty-state {
-  padding: 40px 0;
-  color: #b0a090;
-  font-size: 14px;
-  text-align: center;
-}
-
 /* Footer */
 .footer {
   text-align: center;
@@ -140,7 +109,6 @@ body {
   .header { padding: 14px 0 28px; }
   .hero { padding: 24px 0 20px; }
   .hero-title { font-size: 20px; }
-  .tabs { gap: 16px; }
   .article-item { padding: 16px 0; }
 }
 
@@ -172,8 +140,6 @@ html { scroll-behavior: smooth; }
   padding-left: 8px;
 }
 .article-title { transition: color 200ms ease; }
-
-.tab { transition: all 250ms ease; }
 
 /* 合集卡片与合集详情页 */
 

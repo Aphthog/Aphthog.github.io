@@ -4,6 +4,7 @@ date: 2026-05-15 11:00
 categories: [技术笔记]
 tags: [RAG, 检索, reranker, 混合检索, 分数融合]
 description: 混合检索分数融合、cross-encoder reranker、FP16 推理
+collection: rag-service
 ---
 
 ## 混合检索：双通道并行召回

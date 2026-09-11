@@ -4,6 +4,7 @@ date: 2026-05-15 14:00
 categories: [技术笔记]
 tags: [RAG, debug, segfault, 踩坑, 故障排查]
 description: 七个 bug 的排查过程，从 segfault 到分数越界
+collection: rag-service
 ---
 
 这个项目实际编码时间不算长，但排查各种奇怪问题的时间至少占了一半。这篇文章完整记录遇到的坑和排查思路。

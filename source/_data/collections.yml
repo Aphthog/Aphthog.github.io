@@ -1,0 +1,70 @@
+# 合集定义 —— 首页卡片、/collections/ 页面和导航都读这一份。
+# groups 决定首页与索引页的分节顺序，collections 的 order 决定组内顺序。
+
+groups:
+  - id: tech
+    name: 技术主题线
+    order: 1
+  - id: project
+    name: 项目实践
+    order: 2
+  - id: life
+    name: 写作与摄影
+    order: 3
+
+collections:
+  - id: java-basics
+    name: Java 基础
+    group: tech
+    order: 1
+    description: 集合、IO、异常，Java 语言层面的基本功
+  - id: java-concurrency
+    name: Java 并发
+    group: tech
+    order: 2
+    description: 线程池、锁、并发容器与 CompletableFuture
+  - id: jvm
+    name: JVM
+    group: tech
+    order: 3
+    description: 内存结构、垃圾回收、类加载，以及一次 OOM 排查
+  - id: mysql
+    name: MySQL
+    group: tech
+    order: 4
+    description: 索引、事务、锁，以及一次慢查询优化
+  - id: redis
+    name: Redis
+    group: tech
+    order: 5
+    description: 数据结构、缓存三大问题、持久化与分布式锁
+  - id: llm-agent
+    name: LLM 与 Agent
+    group: tech
+    order: 6
+    description: 从 Token 到 RAG，从工具调用到 Agent 循环
+  - id: rag-service
+    name: RAG 服务
+    group: project
+    order: 1
+    description: 混合检索加精排的语义搜索服务搭建记录
+  - id: qq-bot
+    name: QQ 群 AI 助手
+    group: project
+    order: 2
+    description: Agent 架构、三层安全防御与三层记忆系统
+  - id: group-buy
+    name: 高并发拼团交易系统
+    group: project
+    order: 3
+    description: DDD 分域、折扣试算、库存一致性与退款逆向
+  - id: essay
+    name: 随笔
+    group: life
+    order: 1
+    description: 生活里的零散记录
+  - id: photo
+    name: 摄影
+    group: life
+    order: 2
+    description: 按快门的时候在想什么

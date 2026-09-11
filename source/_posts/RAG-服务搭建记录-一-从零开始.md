@@ -4,6 +4,7 @@ date: 2026-05-15 09:00
 categories: [技术笔记]
 tags: [RAG, 项目, 技术选型, 架构]
 description: 技术选型、架构设计、FAISS vs 其他索引方案
+collection: rag-service
 ---
 
 去年年底开始做一个语义搜索的小项目，目标是搭建一个轻量的 RAG 服务，能够对文档做稠密+稀疏混合检索，再用 cross-encoder 精排。前后断断续续写了一段时间，中间踩了不少坑，记录一下整个过程。

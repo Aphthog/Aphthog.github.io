@@ -4,6 +4,7 @@ date: 2026-05-09
 categories: [技术笔记]
 tags: [Java, 泛型]
 description: 类型擦除、泛型类与方法，一篇搞懂
+collection: java-basics
 ---
 
 泛型是 Java 5 引入的重要特性，它允许在定义类、接口和方法时使用类型参数。

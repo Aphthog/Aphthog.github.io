@@ -4,6 +4,7 @@ date: 2026-05-15 10:00
 categories: [技术笔记]
 tags: [RAG, 嵌入, FAISS, 索引, bge-m3]
 description: bge-m3 双通道编码、FAISS HNSW 构建、多租户持久化
+collection: rag-service
 ---
 
 ## 从句子嵌入到双通道编码

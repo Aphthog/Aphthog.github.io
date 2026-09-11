@@ -4,6 +4,7 @@ date: 2026-08-29 14:00
 categories: [技术笔记]
 tags: [Python, Agent, 安全, 项目]
 description: 系列第 2 篇：13 条注入正则的前置拦截、System Prompt 加固、SSRF 的 DNS 解析校验、run_code 沙箱四层防御，以及每层防御的诚实边界
+collection: qq-bot
 ---
 
 给群聊场景做 AI 助手，接 LLM 本身是最简单的部分，真正花时间的是**不可控的公开输入环境**——群友会注入、会刷屏、会让它执行危险代码。这个系列里安全防御值得单独一篇：针对 Prompt 注入、System Prompt 提取、SSRF、代码执行四类真实攻击，这个项目怎么一层层设防，以及每层防御诚实的边界在哪。

@@ -112,6 +112,47 @@ body {
   .article-item { padding: 16px 0; }
 }
 
+/* 首页动画 */
+.home-hero {
+  text-align: center;
+  padding: 160px 0 120px;
+}
+.home-type-wrap {
+  display: inline-block;
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 32px;
+  color: #3a3028;
+  letter-spacing: 1.5px;
+  line-height: 1.5;
+}
+.home-type-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: typewriter 1.5s ease-out 0.3s forwards;
+  vertical-align: bottom;
+}
+.home-fade {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #b0a090;
+  opacity: 0;
+  animation: fadeIn 0.8s ease-out 2.5s forwards;
+}
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 600px) {
+  .home-hero { padding: 100px 0 80px; }
+  .home-type-wrap { font-size: 26px; }
+}
+
 /* Interaction effects */
 html { scroll-behavior: smooth; }
 
@@ -154,7 +195,34 @@ html { scroll-behavior: smooth; }
   letter-spacing: 0.5px;
 }
 
-/* 合集分组 */
+/* 首页合集卡片（无框，和文章列表风格一致） */
+.collection-card {
+  display: block;
+  padding: 14px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #e0d6c6;
+}
+.collection-card:last-child { border-bottom: none; }
+.collection-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-bottom: 2px;
+  transition: color 200ms;
+}
+.collection-card:hover .collection-name { color: #d4783e; }
+.collection-desc {
+  font-size: 12px;
+  color: #9a8a78;
+  line-height: 1.5;
+}
+.collection-count {
+  font-size: 12px;
+  color: #d4783e;
+  margin-top: 6px;
+}
+
+/* 合集展开/收缩 */
 .collection-group { margin-bottom: 28px; }
 .collection-group:last-child { margin-bottom: 0; }
 .group-title {
@@ -163,42 +231,67 @@ html { scroll-behavior: smooth; }
   letter-spacing: 1.2px;
   margin-bottom: 14px;
 }
-.collection-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+
+.co-details:last-of-type { border-bottom: none; }
+
+.co-summary {
+  display: flex;
+  align-items: center;
+  padding: 14px 0;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: color 200ms;
 }
-.collection-card {
-  display: block;
-  padding: 16px 18px;
-  background: #fbf8f3;
-  border: 1px solid #e0d6c6;
-  border-radius: 6px;
-  text-decoration: none;
-  transition: all 250ms ease;
-}
-.collection-card:hover {
-  border-color: #d4783e;
-  transform: translateY(-2px);
-}
-.collection-name {
+.co-summary:hover { color: #d4783e; }
+.co-summary::-webkit-details-marker { display: none; }
+
+.co-name {
+  flex: 1;
   font-size: 15px;
+  font-weight: 500;
   color: #3a3028;
-  margin-bottom: 4px;
 }
-.collection-desc {
+.co-details[open] .co-name { color: #d4783e; }
+.co-count {
+  font-size: 12px;
+  color: #b0a090;
+  margin-right: 6px;
+}
+.co-arrow {
+  font-size: 12px;
+  color: #b0a090;
+  transition: transform 200ms;
+}
+.co-details[open] .co-arrow { transform: rotate(90deg); }
+
+.co-articles { padding: 0; }
+.co-articles .article-item {
+  padding: 12px 0 12px 16px;
+}
+.co-articles .article-date {
+  font-size: 12px;
+  color: #b0a090;
+  letter-spacing: 0.3px;
+}
+.co-articles .article-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-top: 2px;
+  transition: color 200ms;
+}
+.co-articles .article-item:hover .article-title { color: #d4783e; }
+.co-articles .article-excerpt {
   font-size: 12px;
   color: #9a8a78;
+  margin-top: 2px;
   line-height: 1.5;
-  min-height: 36px;
 }
-.collection-count {
-  font-size: 12px;
-  color: #d4783e;
-  margin-top: 8px;
-}
-@media (max-width: 600px) {
-  .collection-grid { grid-template-columns: 1fr 1fr; }
+.co-empty {
+  padding: 14px 14px 14px 16px;
+  font-size: 13px;
+  color: #b0a090;
 }
 
 /* 合集详情页 */

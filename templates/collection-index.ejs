@@ -13,15 +13,26 @@
   <% groups.forEach(function (g) { %>
   <div class="collection-group">
     <div class="group-title"><%= g.name %></div>
-    <div class="collection-grid">
-      <% g.collections.forEach(function (c) { %>
-      <a class="collection-card" href="/collections/<%= c.id %>/">
-        <div class="collection-name"><%= c.name %></div>
-        <div class="collection-desc"><%= c.description %></div>
-        <div class="collection-count"><%= c.count %> 篇</div>
-      </a>
-      <% }); %>
-    </div>
+    <% g.collections.forEach(function (c) { %>
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name"><%= c.name %></span>
+        <span class="co-count"><%= c.count %> 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        <% if (c.posts.length === 0) { %>
+        <p class="co-empty">暂无文章</p>
+        <% } else { c.posts.forEach(function (p) { %>
+        <a class="article-item" href="<%= p.url %>">
+          <div class="article-date"><%= p.date %></div>
+          <div class="article-title"><%= p.title %></div>
+          <div class="article-excerpt"><%= p.excerpt %></div>
+        </a>
+        <% }); } %>
+      </div>
+    </details>
+    <% }); %>
   </div>
   <% }); %>
 

@@ -1,38 +1,30 @@
 'use strict';
 
 /**
- * 首页生成器。
- * 从文章数据渲染替换掉 source/index.html 的首页，
- * 文章按分类分组：技术笔记 / 摄影 / 随笔，按日期倒序。
+ * 首页生成器：落地页。
+ * 上半部分是合集卡片（来自 source/_data/collections.yml），
+ * 下半部分是最新的 N 篇文章。
  */
 
 const path = require('path');
 const fs = require('fs');
 const { toPostView } = require('../tools/lib/posts');
+const { buildCollectionGroups } = require('../tools/lib/collections');
 
-const TABS = [
-  { category: '技术笔记', id: 'tech' },
-  { category: '摄影', id: 'photo' },
-  { category: '随笔', id: 'essay' }
-];
-
+const LATEST_COUNT = 8;
 const TEMPLATE = path.join(__dirname, '..', 'templates', 'homepage.ejs');
 
 hexo.extend.generator.register('homepage', function (locals) {
-  const grouped = {};
-  TABS.forEach(t => { grouped[t.id] = []; });
-  const tabByCategory = {};
-  TABS.forEach(t => { tabByCategory[t.category] = t.id; });
-
-  locals.posts.sort('date', -1).toArray().forEach(post => {
-    const cats = post.categories.toArray();
-    const tabId = (cats.length && tabByCategory[cats[0].name]) || 'essay';
-    grouped[tabId].push(toPostView(post));
-  });
+  const groups = buildCollectionGroups(locals);
+  const latest = locals.posts
+    .sort('date', -1)
+    .limit(LATEST_COUNT)
+    .toArray()
+    .map(toPostView);
 
   const html = hexo.render.renderSync(
     { text: fs.readFileSync(TEMPLATE, 'utf8'), engine: 'ejs', path: TEMPLATE },
-    { tabs: grouped }
+    { groups, latest }
   );
   return { path: 'index.html', data: html };
 });

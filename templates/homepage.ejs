@@ -10,41 +10,38 @@
     <div class="hero-sub">技术笔记 · 摄影 · 随笔</div>
   </div>
 
-  <div class="tabs">
-    <button class="tab active" data-section="tech">技术笔记</button>
-    <button class="tab" data-section="photo">摄影</button>
-    <button class="tab" data-section="essay">随笔</button>
-  </div>
+  <section class="section">
+    <h2 class="section-title">合集</h2>
+    <% groups.forEach(function (g) { %>
+    <div class="collection-group">
+      <div class="group-title"><%= g.name %></div>
+      <div class="collection-grid">
+        <% g.collections.forEach(function (c) { %>
+        <a class="collection-card" href="/collections/<%= c.id %>/">
+          <div class="collection-name"><%= c.name %></div>
+          <div class="collection-desc"><%= c.description %></div>
+          <div class="collection-count"><%= c.count %> 篇</div>
+        </a>
+        <% }); %>
+      </div>
+    </div>
+    <% }); %>
+  </section>
 
-  <% ['tech', 'photo', 'essay'].forEach(function (id) { %>
-  <div class="section-content<%- id === 'tech' ? ' active' : '' %>" id="<%- id %>">
-    <% tabs[id].forEach(function (p) { %>
-    <a class="article-item" href="<%- p.url %>">
-      <div class="article-date"><%- p.date %></div>
-      <div class="article-title"><%- p.title %></div>
-      <div class="article-excerpt"><%- p.excerpt %></div>
+  <section class="section">
+    <h2 class="section-title">最新</h2>
+    <% latest.forEach(function (p) { %>
+    <a class="article-item" href="<%= p.url %>">
+      <div class="article-date"><%= p.date %></div>
+      <div class="article-title"><%= p.title %></div>
+      <div class="article-excerpt"><%= p.excerpt %></div>
     </a>
     <% }); %>
-    <% if (!tabs[id].length) { %>
-    <div class="empty-state">这里还没有文章</div>
-    <% } %>
-  </div>
-  <% }); %>
+  </section>
 
   <%- include('partials/footer') %>
 
 </div>
-
-<script>
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
-    document.getElementById(tab.dataset.section).classList.add('active');
-  });
-});
-</script>
 
 </body>
 </html>

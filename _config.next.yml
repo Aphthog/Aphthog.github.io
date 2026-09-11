@@ -41,10 +41,11 @@ theme_color:
 
 # ---------- 菜单 ----------
 menu:
-  home: / || fa fa-home
-  about: /about/ || fa fa-user
-  archives: /archives/ || fa fa-archive
-  tags: /tags/ || fa fa-tags
+  首页: / || fa fa-home
+  合集: /collections/ || fa fa-book
+  分类: /categories/ || fa fa-folder-open
+  归档: /archives/ || fa fa-archive
+  关于: /about/ || fa fa-user
 
 # ---------- 侧边栏 ----------
 sidebar:

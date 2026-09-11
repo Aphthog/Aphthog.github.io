@@ -42,6 +42,25 @@ function main() {
   const errors = [];
   const counts = {};
 
+  // 未知的 CLI 合集 id：不静默忽略，否则 `mysq`（mysql 的手误）会被放行
+  const expectedIds = Object.keys(EXPECTED);
+  const expectedSet = new Set(expectedIds);
+  only.filter(id => !expectedSet.has(id)).forEach(id => {
+    errors.push(`未知的合集 id "${id}"`);
+  });
+
+  // EXPECTED 与 collections.yml 的 id 集合必须一致，
+  // 否则新增的合集会被合法性检查放行却永远不参与计数校验
+  const onlyInYml = [...known].filter(id => !expectedSet.has(id));
+  const onlyInExpected = expectedIds.filter(id => !known.has(id));
+  if (onlyInYml.length || onlyInExpected.length) {
+    errors.push(
+      'EXPECTED 与 collections.yml 的合集 id 不一致：' +
+      `collections.yml 独有 [${onlyInYml.join(', ')}]，` +
+      `EXPECTED 独有 [${onlyInExpected.join(', ')}]`
+    );
+  }
+
   fs.readdirSync(POSTS_DIR)
     .filter(f => f.endsWith('.md'))
     .forEach(f => {

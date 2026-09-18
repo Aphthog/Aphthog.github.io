@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合集 · Camille</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f1ea;
+  color: #3a3028;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+
+.container {
+  width: 100%;
+  max-width: 780px;
+  padding: 0 24px;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0 48px;
+}
+.site-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #d4783e;
+  text-decoration: none;
+  letter-spacing: 1.5px;
+}
+.header-nav { display: flex; gap: 20px; }
+.header-nav a {
+  font-size: 13px;
+  color: #9a8a78;
+  text-decoration: none;
+  transition: color 200ms;
+}
+.header-nav a:hover { color: #d4783e; }
+
+/* Hero */
+.hero {
+  text-align: center;
+  margin-bottom: 44px;
+  padding: 40px 0 32px;
+  border-bottom: 1px solid #e0d6c6;
+}
+.hero-title {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 24px;
+  font-weight: 400;
+  color: #3a3028;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+.hero-sub {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b0a090;
+  letter-spacing: 0.3px;
+}
+
+.article-item {
+  display: block;
+  padding: 20px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #e0d6c6;
+}
+.article-item:last-child { border-bottom: none; }
+.article-date {
+  font-size: 12px;
+  color: #b0a090;
+  margin-bottom: 3px;
+  letter-spacing: 0.3px;
+}
+.article-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-bottom: 3px;
+  transition: color 200ms;
+}
+.article-item:hover .article-title { color: #d4783e; }
+.article-excerpt {
+  font-size: 13px;
+  color: #9a8a78;
+  line-height: 1.5;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 48px 0 24px;
+  font-size: 12px;
+  color: #c0b8a8;
+}
+
+@media (max-width: 600px) {
+  .header { padding: 14px 0 28px; }
+  .hero { padding: 24px 0 20px; }
+  .hero-title { font-size: 20px; }
+  .article-item { padding: 16px 0; }
+}
+
+/* 首页动画 */
+.home-hero {
+  text-align: center;
+  padding: 160px 0 120px;
+}
+.home-type-wrap {
+  display: inline-block;
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-size: 32px;
+  color: #3a3028;
+  letter-spacing: 1.5px;
+  line-height: 1.5;
+}
+.home-type-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: typewriter 1.5s ease-out 0.3s forwards;
+  vertical-align: bottom;
+}
+.home-fade {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #b0a090;
+  opacity: 0;
+  animation: fadeIn 0.8s ease-out 2.5s forwards;
+}
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 600px) {
+  .home-hero { padding: 100px 0 80px; }
+  .home-type-wrap { font-size: 26px; }
+}
+
+/* Interaction effects */
+html { scroll-behavior: smooth; }
+
+.header-nav a {
+  position: relative;
+  transition: color 200ms ease;
+}
+.header-nav a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #d4783e;
+  transition: width 250ms ease;
+}
+.header-nav a:hover::after {
+  width: 100%;
+}
+
+.article-item {
+  transition: all 250ms ease;
+}
+.article-item:hover {
+  padding-left: 8px;
+}
+.article-title { transition: color 200ms ease; }
+
+/* 合集卡片与合集详情页 */
+
+/* 区块标题 */
+.section { margin-bottom: 44px; }
+.section-title {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-weight: 400;
+  font-size: 18px;
+  color: #3a3028;
+  margin-bottom: 20px;
+  letter-spacing: 0.5px;
+}
+
+/* 首页合集卡片（无框，和文章列表风格一致） */
+.collection-card {
+  display: block;
+  padding: 14px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #e0d6c6;
+}
+.collection-card:last-child { border-bottom: none; }
+.collection-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-bottom: 2px;
+  transition: color 200ms;
+}
+.collection-card:hover .collection-name { color: #d4783e; }
+.collection-desc {
+  font-size: 12px;
+  color: #9a8a78;
+  line-height: 1.5;
+}
+.collection-count {
+  font-size: 12px;
+  color: #d4783e;
+  margin-top: 6px;
+}
+
+/* 合集展开/收缩 */
+.collection-group { margin-bottom: 28px; }
+.collection-group:last-child { margin-bottom: 0; }
+.group-title {
+  font-size: 12px;
+  color: #b0a090;
+  letter-spacing: 1.2px;
+  margin-bottom: 14px;
+}
+
+.co-details:last-of-type { border-bottom: none; }
+
+.co-summary {
+  display: flex;
+  align-items: center;
+  padding: 14px 0;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition: color 200ms;
+}
+.co-summary:hover { color: #d4783e; }
+.co-summary::-webkit-details-marker { display: none; }
+
+.co-name {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+  color: #3a3028;
+}
+.co-details[open] .co-name { color: #d4783e; }
+.co-count {
+  font-size: 12px;
+  color: #b0a090;
+  margin-right: 6px;
+}
+.co-arrow {
+  font-size: 12px;
+  color: #b0a090;
+  transition: transform 200ms;
+}
+.co-details[open] .co-arrow { transform: rotate(90deg); }
+
+.co-articles { padding: 0; }
+.co-articles .article-item {
+  padding: 12px 0 12px 16px;
+}
+.co-articles .article-date {
+  font-size: 12px;
+  color: #b0a090;
+  letter-spacing: 0.3px;
+}
+.co-articles .article-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3a3028;
+  margin-top: 2px;
+  transition: color 200ms;
+}
+.co-articles .article-item:hover .article-title { color: #d4783e; }
+.co-articles .article-excerpt {
+  font-size: 12px;
+  color: #9a8a78;
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.co-empty {
+  padding: 14px 14px 14px 16px;
+  font-size: 13px;
+  color: #b0a090;
+}
+
+/* 合集详情页 */
+.back-link {
+  display: inline-block;
+  font-size: 13px;
+  color: #9a8a78;
+  text-decoration: none;
+  margin-bottom: 18px;
+  transition: color 200ms;
+}
+.back-link:hover { color: #d4783e; }
+.collection-head {
+  padding: 4px 0 26px;
+  border-bottom: 1px solid #e0d6c6;
+  margin-bottom: 4px;
+}
+.collection-head h1 {
+  font-family: Georgia, 'Noto Serif SC', serif;
+  font-weight: 400;
+  font-size: 22px;
+  color: #3a3028;
+}
+.collection-head p {
+  font-size: 13px;
+  color: #9a8a78;
+  margin-top: 6px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <header class="header">
+  <a href="/" class="site-name">Camille</a>
+  <nav class="header-nav">
+    <a href="/">首页</a>
+    <a href="/collections/">合集</a>
+    <a href="/categories/">分类</a>
+    <a href="/archives/">归档</a>
+    <a href="/about/">关于</a>
+  </nav>
+</header>
+
+
+  <div class="hero">
+    <div class="hero-title">合集</div>
+    <div class="hero-sub">按主题和项目整理的文章</div>
+  </div>
+
+  
+  <div class="collection-group">
+    <div class="group-title">技术主题线</div>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">Java 基础</span>
+        <span class="co-count">5 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2025/04/26/Java-泛型入门/">
+          <div class="article-date">Apr 26</div>
+          <div class="article-title">Java 泛型入门</div>
+          <div class="article-excerpt">类型擦除、泛型类与方法，一篇搞懂</div>
+        </a>
+        
+        <a class="article-item" href="/2025/04/12/异常处理入门-checked和unchecked差在哪/">
+          <div class="article-date">Apr 12</div>
+          <div class="article-title">异常处理入门：checked 和 unchecked 差在哪</div>
+          <div class="article-excerpt">checked 与 unchecked 的区别、使用时机，以及三个常见的异常反模式</div>
+        </a>
+        
+        <a class="article-item" href="/2025/03/15/Java-IO与NIO-两种读写模型的区别/">
+          <div class="article-date">Mar 15</div>
+          <div class="article-title">Java IO 与 NIO：两种读写模型的区别</div>
+          <div class="article-excerpt">BIO 的流与阻塞、NIO 的 Channel 与 Selector，以及各自的适用场景</div>
+        </a>
+        
+        <a class="article-item" href="/2025/02/16/HashMap-入门-从put到扩容/">
+          <div class="article-date">Feb 16</div>
+          <div class="article-title">HashMap 入门：从 put 到扩容</div>
+          <div class="article-excerpt">从 put 的链路讲到扩容时机，理清 HashMap 的数组、链表与红黑树</div>
+        </a>
+        
+        <a class="article-item" href="/2025/01/12/Java-集合入门-ArrayList和LinkedList该怎么选/">
+          <div class="article-date">Jan 12</div>
+          <div class="article-title">Java 集合入门：ArrayList 和 LinkedList 该怎么选</div>
+          <div class="article-excerpt">结合底层结构对比 ArrayList 与 LinkedList 的操作代价与选择依据</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">Java 并发</span>
+        <span class="co-count">6 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2025/10/18/CompletableFuture入门-把串行调用并行起来/">
+          <div class="article-date">Oct 18</div>
+          <div class="article-title">CompletableFuture 入门：把串行调用并行起来</div>
+          <div class="article-excerpt">从串行调接口的耗时切入，讲任务创建、组合、异常处理与线程池选择</div>
+        </a>
+        
+        <a class="article-item" href="/2025/09/13/并发容器入门-ConcurrentHashMap/">
+          <div class="article-date">Sep 13</div>
+          <div class="article-title">并发容器入门：ConcurrentHashMap</div>
+          <div class="article-excerpt">从 HashMap 的并发问题讲到 ConcurrentHashMap 的分段锁</div>
+        </a>
+        
+        <a class="article-item" href="/2025/08/16/synchronized和ReentrantLock的区别/">
+          <div class="article-date">Aug 16</div>
+          <div class="article-title">synchronized 和 ReentrantLock 的区别</div>
+          <div class="article-excerpt">用法对比、锁升级，以及 ReentrantLock 多出的几项能力</div>
+        </a>
+        
+        <a class="article-item" href="/2025/07/12/volatile到底解决了什么问题/">
+          <div class="article-date">Jul 12</div>
+          <div class="article-title">volatile 到底解决了什么问题</div>
+          <div class="article-excerpt">volatile 的可见性与有序性保证、内存屏障直觉，以及它为什么替代不了锁</div>
+        </a>
+        
+        <a class="article-item" href="/2025/06/14/线程安全的三类问题-原子性-可见性-有序性/">
+          <div class="article-date">Jun 14</div>
+          <div class="article-title">线程安全的三类问题：原子性、可见性、有序性</div>
+          <div class="article-excerpt">从 i++ 少加讲起，拆开原子性、可见性与有序性三类并发问题及对策</div>
+        </a>
+        
+        <a class="article-item" href="/2025/05/10/为什么不要new-Thread-线程池入门/">
+          <div class="article-date">May 10</div>
+          <div class="article-title">为什么不要 new Thread：线程池入门</div>
+          <div class="article-excerpt">new Thread 的三个问题，线程池七个参数与任务提交后的流转顺序</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">JVM</span>
+        <span class="co-count">4 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/02/14/一次OOM排查记录/">
+          <div class="article-date">Feb 14</div>
+          <div class="article-title">一次 OOM 排查记录</div>
+          <div class="article-excerpt">服务跑一夜 OOM 的排查：dump、MAT 支配树定位、本地缓存淘汰缺失修复</div>
+        </a>
+        
+        <a class="article-item" href="/2026/01/17/类加载机制入门/">
+          <div class="article-date">Jan 17</div>
+          <div class="article-title">类加载机制入门</div>
+          <div class="article-excerpt">类加载的七个阶段，准备与初始化的区别，双亲委派模型及其意义</div>
+        </a>
+        
+        <a class="article-item" href="/2025/12/20/垃圾回收入门-从GC-Roots说起/">
+          <div class="article-date">Dec 20</div>
+          <div class="article-title">垃圾回收入门：从 GC Roots 说起</div>
+          <div class="article-excerpt">引用计数缺陷、可达性分析、GC Roots 类型，分代假设与四种收集器概览</div>
+        </a>
+        
+        <a class="article-item" href="/2025/11/22/JVM-内存结构入门/">
+          <div class="article-date">Nov 22</div>
+          <div class="article-title">JVM 内存结构入门</div>
+          <div class="article-excerpt">运行时数据区五块的内存划分，线程私有与共享，堆的分代结构</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">MySQL</span>
+        <span class="co-count">7 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/06/13/一次慢查询优化实践/">
+          <div class="article-date">Jun 13</div>
+          <div class="article-title">一次慢查询优化实践</div>
+          <div class="article-excerpt">列表接口P99从200ms涨到2s排查过程：慢查询日志、深分页根因、延迟关联改写</div>
+        </a>
+        
+        <a class="article-item" href="/2026/05/16/加锁分析-间隙锁与死锁/">
+          <div class="article-date">May 16</div>
+          <div class="article-title">加锁分析：间隙锁与死锁</div>
+          <div class="article-excerpt">行锁间隙锁临键锁区别，两条UPDATE加锁顺序相反的死锁实例与减少死锁实践</div>
+        </a>
+        
+        <a class="article-item" href="/2026/04/25/MVCC与隔离级别入门/">
+          <div class="article-date">Apr 25</div>
+          <div class="article-title">MVCC 与隔离级别入门</div>
+          <div class="article-excerpt">四种隔离级别与各自问题，MVCC三件套，RR下如何避免幻读，快照读vs当前读</div>
+        </a>
+        
+        <a class="article-item" href="/2026/04/11/事务与ACID-从一次转账说起/">
+          <div class="article-date">Apr 11</div>
+          <div class="article-title">事务与 ACID：从一次转账说起</div>
+          <div class="article-excerpt">ACID：undo log/redo log/锁+MVCC保证什么，长事务危害</div>
+        </a>
+        
+        <a class="article-item" href="/2026/03/28/explain怎么看-一次慢查询分析/">
+          <div class="article-date">Mar 28</div>
+          <div class="article-title">explain 怎么看：一次慢查询分析</div>
+          <div class="article-excerpt">explain各列、type排名、filesort含义，一条真实慢SQL走一遍</div>
+        </a>
+        
+        <a class="article-item" href="/2026/03/14/联合索引与最左前缀原则/">
+          <div class="article-date">Mar 14</div>
+          <div class="article-title">联合索引与最左前缀原则</div>
+          <div class="article-excerpt">联合索引(a,b,c)的最左前缀规则，explain对比验证，索引列顺序怎么定</div>
+        </a>
+        
+        <a class="article-item" href="/2026/02/28/MySQL-索引入门-B+树为什么快/">
+          <div class="article-date">Feb 28</div>
+          <div class="article-title">MySQL 索引入门：B+ 树为什么快</div>
+          <div class="article-excerpt">为什么B+树是MySQL索引的默认选择，从磁盘IO和范围查询的角度讲清楚</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">Redis</span>
+        <span class="co-count">6 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/09/05/缓存与数据库的一致性入门/">
+          <div class="article-date">Sep 05</div>
+          <div class="article-title">缓存与数据库的一致性入门</div>
+          <div class="article-excerpt">四种缓存更新策略的并发问题分析与不一致窗口缩小方案</div>
+        </a>
+        
+        <a class="article-item" href="/2026/08/22/Redis-过期策略与内存淘汰/">
+          <div class="article-date">Aug 22</div>
+          <div class="article-title">Redis 过期策略与内存淘汰</div>
+          <div class="article-excerpt">Redis惰性删除与定期删除的配合及八种淘汰策略的取舍</div>
+        </a>
+        
+        <a class="article-item" href="/2026/08/08/分布式锁入门-从SETNX说起/">
+          <div class="article-date">Aug 08</div>
+          <div class="article-title">分布式锁入门：从 SETNX 说起</div>
+          <div class="article-excerpt">从SETNX到Redlock的分布式锁实现与常见坑点</div>
+        </a>
+        
+        <a class="article-item" href="/2026/07/25/Redis-持久化-RDB与AOF/">
+          <div class="article-date">Jul 25</div>
+          <div class="article-title">Redis 持久化：RDB 与 AOF</div>
+          <div class="article-excerpt">RDB快照与AOF命令追加两种持久化策略的对比与选择</div>
+        </a>
+        
+        <a class="article-item" href="/2026/07/11/缓存穿透-击穿-雪崩-三个常被念错的名词/">
+          <div class="article-date">Jul 11</div>
+          <div class="article-title">缓存穿透、击穿、雪崩：三个常被念错的名词</div>
+          <div class="article-excerpt">清晰区分缓存穿透击穿雪崩三个易混概念及对应解决方案</div>
+        </a>
+        
+        <a class="article-item" href="/2026/06/27/Redis-数据结构入门-五种类型怎么用/">
+          <div class="article-date">Jun 27</div>
+          <div class="article-title">Redis 数据结构入门：五种类型怎么用</div>
+          <div class="article-excerpt">String/Hash/List/Set/ZSet的典型用途与选型建议</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">LLM 与 Agent</span>
+        <span class="co-count">8 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/07/18/LLM-应用的成本与延迟-一次权衡记录/">
+          <div class="article-date">Jul 18</div>
+          <div class="article-title">LLM 应用的成本与延迟：一次权衡记录</div>
+          <div class="article-excerpt">输入输出定价差异，三种延迟来源，四种节省策略，延迟比成本更影响体验</div>
+        </a>
+        
+        <a class="article-item" href="/2026/05/23/上下文工程入门-Agent-的记忆该怎么设计/">
+          <div class="article-date">May 23</div>
+          <div class="article-title">上下文工程入门：Agent 的记忆该怎么设计</div>
+          <div class="article-excerpt">三层记忆划分，截断与总结的取舍，多轮对话上下文爆炸案例</div>
+        </a>
+        
+        <a class="article-item" href="/2026/04/04/什么是-MCP/">
+          <div class="article-date">Apr 04</div>
+          <div class="article-title">什么是 MCP</div>
+          <div class="article-excerpt">工具接入标准化的背景，三个角色分工，协议的真正边界</div>
+        </a>
+        
+        <a class="article-item" href="/2026/03/07/Agent-的基本循环-感知-决策-执行/">
+          <div class="article-date">Mar 07</div>
+          <div class="article-title">Agent 的基本循环：感知、决策、执行</div>
+          <div class="article-excerpt">ReAct循环的简化，终止条件与最大轮数，Agent与固定workflow选择</div>
+        </a>
+        
+        <a class="article-item" href="/2026/02/07/Function-Calling-让模型学会调用工具/">
+          <div class="article-date">Feb 07</div>
+          <div class="article-title">Function Calling：让模型学会调用工具</div>
+          <div class="article-excerpt">完整的工具调用往返过程，参数校验归属，两个常见失败的坑</div>
+        </a>
+        
+        <a class="article-item" href="/2026/01/10/向量与相似度-余弦相似度入门/">
+          <div class="article-date">Jan 10</div>
+          <div class="article-title">向量与相似度：余弦相似度入门</div>
+          <div class="article-excerpt">嵌入把文本变成浮点数，余弦夹角的几何直觉，为什么检索里不用欧氏距离</div>
+        </a>
+        
+        <a class="article-item" href="/2025/12/06/从-Prompt-到-RAG-为什么模型需要外部知识/">
+          <div class="article-date">Dec 06</div>
+          <div class="article-title">从 Prompt 到 RAG：为什么模型需要外部知识</div>
+          <div class="article-excerpt">三种补知识方式的成本与适用面，RAG基本流程，什么时候它是过度设计</div>
+        </a>
+        
+        <a class="article-item" href="/2025/11/08/什么是-Token-模型是怎么读你的话的/">
+          <div class="article-date">Nov 08</div>
+          <div class="article-title">什么是 Token：模型是怎么读你的话的</div>
+          <div class="article-excerpt">模型不看字只看 token，BPE 拆分直觉，中文为什么更费 token</div>
+        </a>
+        
+      </div>
+    </details>
+    
+  </div>
+  
+  <div class="collection-group">
+    <div class="group-title">项目实践</div>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">RAG 服务</span>
+        <span class="co-count">4 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-四-踩坑记/">
+          <div class="article-date">May 15</div>
+          <div class="article-title">RAG 服务搭建记录（四）：踩坑记</div>
+          <div class="article-excerpt">七个 bug 的排查过程，从 segfault 到分数越界</div>
+        </a>
+        
+        <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-三-检索与精排/">
+          <div class="article-date">May 15</div>
+          <div class="article-title">RAG 服务搭建记录（三）：检索与精排</div>
+          <div class="article-excerpt">混合检索分数融合、cross-encoder reranker、FP16 推理</div>
+        </a>
+        
+        <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-二-嵌入与索引/">
+          <div class="article-date">May 15</div>
+          <div class="article-title">RAG 服务搭建记录（二）：嵌入与索引</div>
+          <div class="article-excerpt">bge-m3 双通道编码、FAISS HNSW 构建、多租户持久化</div>
+        </a>
+        
+        <a class="article-item" href="/2026/05/15/RAG-服务搭建记录-一-从零开始/">
+          <div class="article-date">May 15</div>
+          <div class="article-title">RAG 服务搭建记录（一）：从零开始</div>
+          <div class="article-excerpt">技术选型、架构设计、FAISS vs 其他索引方案</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">QQ 群 AI 助手</span>
+        <span class="co-count">3 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/08/29/QQ群AI助手开发记录-三-三层记忆系统/">
+          <div class="article-date">Aug 29</div>
+          <div class="article-title">QQ 群 AI 助手开发记录（三）：三层记忆系统</div>
+          <div class="article-excerpt">系列第 3 篇：SQLite 工作记忆、ChromaDB 语义记忆、LLM 抽取的用户画像——三层各管什么、怎么组装进上下文、节流设计，以及 ChromaDB 替代 FAISS 的选型逻辑</div>
+        </a>
+        
+        <a class="article-item" href="/2026/08/29/QQ群AI助手开发记录-二-三层安全防御/">
+          <div class="article-date">Aug 29</div>
+          <div class="article-title">QQ 群 AI 助手开发记录（二）：三层安全防御</div>
+          <div class="article-excerpt">系列第 2 篇：13 条注入正则的前置拦截、System Prompt 加固、SSRF 的 DNS 解析校验、run_code 沙箱四层防御，以及每层防御的诚实边界</div>
+        </a>
+        
+        <a class="article-item" href="/2026/08/29/QQ群AI助手开发记录-一-Agent架构与工具框架/">
+          <div class="article-date">Aug 29</div>
+          <div class="article-title">QQ 群 AI 助手开发记录（一）：Agent 架构与工具框架</div>
+          <div class="article-excerpt">系列第 1 篇：从脚本式 V1 到 Agent V2 的重构——单循环替代五阶段设计、@tool 注册框架、并行执行器、LLM 网关与搜索降级</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">高并发拼团交易系统</span>
+        <span class="co-count">4 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-四-结算回调与退款逆向/">
+          <div class="article-date">Aug 29</div>
+          <div class="article-title">高并发拼团交易系统拆解（四）：结算回调与退款逆向</div>
+          <div class="article-excerpt">系列第 4 篇：结算的三连条件更新、事务性发件箱保证回调必达、定时补偿与 Redisson 抢占、退款状态机的枚举路由、「团失败」到底由谁判定的状态机不闭环，以及整个系列的设计观总结</div>
+        </a>
+        
+        <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-三-库存一致性与幂等/">
+          <div class="article-date">Aug 29</div>
+          <div class="article-title">高并发拼团交易系统拆解（三）：库存一致性与幂等</div>
+          <div class="article-excerpt">系列第 3 篇：防超卖三层防线（INCR 快拒、恢复量记账、SET NX 兜底、条件更新封盘）、责任链锁单校验、四处幂等的四种打法，以及一个真实的时间单位 bug</div>
+        </a>
+        
+        <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-二-折扣试算与规则编排/">
+          <div class="article-date">Aug 29</div>
+          <div class="article-title">高并发拼团交易系统拆解（二）：折扣试算与规则编排</div>
+          <div class="article-excerpt">系列第 2 篇：试算接口的规则树编排、DCC 动态开关、策略模式的 Map 注入路由、模板方法收敛公共逻辑，以及 500ms 到 200ms 的并行化推导</div>
+        </a>
+        
+        <a class="article-item" href="/2026/08/29/高并发拼团交易系统拆解-一-架构总览与领域分域/">
+          <div class="article-date">Aug 29</div>
+          <div class="article-title">高并发拼团交易系统拆解（一）：架构总览与领域分域</div>
+          <div class="article-excerpt">系列第 1 篇：拼团营销系统的边界划分、DDD 四层 + 三域的落地方式、10 张表的归属，以及人群标签 Bitmap 方案的内存账本与 MD5 取模的坑</div>
+        </a>
+        
+      </div>
+    </details>
+    
+  </div>
+  
+  <div class="collection-group">
+    <div class="group-title">写作与摄影</div>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">随笔</span>
+        <span class="co-count">2 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/05/09/五月记/">
+          <div class="article-date">May 09</div>
+          <div class="article-title">五月记</div>
+          <div class="article-excerpt">读书、摄影、以及最近做的事</div>
+        </a>
+        
+        <a class="article-item" href="/2025/01/05/我的第一篇文章/">
+          <div class="article-date">Jan 05</div>
+          <div class="article-title">我的第一篇文章</div>
+          <div class="article-excerpt">用 Markdown 写文章，保持简单</div>
+        </a>
+        
+      </div>
+    </details>
+    
+    <details class="co-details">
+      <summary class="co-summary">
+        <span class="co-name">摄影</span>
+        <span class="co-count">1 篇</span>
+        <span class="co-arrow">▸</span>
+      </summary>
+      <div class="co-articles">
+        
+        <a class="article-item" href="/2026/05/09/街角/">
+          <div class="article-date">May 09</div>
+          <div class="article-title">街角</div>
+          <div class="article-excerpt">35mm 焦段的日常练习</div>
+        </a>
+        
+      </div>
+    </details>
+    
+  </div>
+  
+
+  <div class="footer">© 2026 Camille</div>
+
+
+</div>
+
+</body>
+</html>
